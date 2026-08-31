@@ -12,6 +12,7 @@ add_library(dumper STATIC dumper.cpp)
 add_subdirectory(DumperCore)
 add_subdirectory(Engines)
 add_subdirectory(Export)
+add_subdirectory(config)
 
 # ---------------------------------------------------------------------------
 # Real wiring (uncomment as sub-libraries become available):
