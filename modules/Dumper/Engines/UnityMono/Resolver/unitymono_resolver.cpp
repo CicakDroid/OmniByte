@@ -1,5 +1,3 @@
-// UnityMono/Resolver placeholder.
-// Stage 1 scaffolding only: no logic yet.
-extern "C" int unitymono_resolver_placeholder_init() {
-    return 0;
-}
+#include "UnityMonoResolver.h"
+
+namespace omnibyte::dumper::unitymono {}
