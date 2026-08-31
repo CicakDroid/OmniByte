@@ -2,16 +2,16 @@
 // EngineDetection/EngineDetectionLoader.h — load EngineDetectionConfig from JSON.
 
 #include "EngineDetectionConfig.h"
-#include "../Common/ConfigLoader.h"
+#include <common/Serialization/JsonLoader.h>
 
 namespace omnibyte::dumper::config {
 
 inline EngineDetectionConfig loadEngineDetectionConfig(const std::string& path) {
-    auto j = loadJsonFile(path);
+    auto j = omnibyte::common::loadJsonFile(path);
     if (!j) return EngineDetectionConfig::defaults();
 
     EngineDetectionConfig cfg;
-    cfg.confidenceThreshold = getOr<float>(*j, "confidenceThreshold", cfg.confidenceThreshold);
+    cfg.confidenceThreshold = omnibyte::common::getOr<float>(*j, "confidenceThreshold", cfg.confidenceThreshold);
 
     if (j->contains("manualEngineOverride") && j->at("manualEngineOverride").is_string()) {
         cfg.manualEngineOverride = j->at("manualEngineOverride").get<std::string>();

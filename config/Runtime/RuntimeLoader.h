@@ -2,7 +2,7 @@
 // Runtime/RuntimeLoader.h — load RuntimeConfig from JSON.
 
 #include "RuntimeConfig.h"
-#include "../Common/ConfigLoader.h"
+#include <common/Serialization/JsonLoader.h>
 #include <unordered_map>
 
 namespace omnibyte::dumper::config {
@@ -17,12 +17,12 @@ namespace {
 } // anonymous namespace
 
 inline RuntimeConfig loadRuntimeConfig(const std::string& path) {
-    auto j = loadJsonFile(path);
+    auto j = omnibyte::common::loadJsonFile(path);
     if (!j) return RuntimeConfig::defaults();
 
     RuntimeConfig cfg;
-    cfg.requireRoot      = getOr<bool>(*j, "requireRoot", cfg.requireRoot);
-    cfg.attachTimeoutMs  = getOr<uint32_t>(*j, "attachTimeoutMs", cfg.attachTimeoutMs);
+    cfg.requireRoot      = omnibyte::common::getOr<bool>(*j, "requireRoot", cfg.requireRoot);
+    cfg.attachTimeoutMs  = omnibyte::common::getOr<uint32_t>(*j, "attachTimeoutMs", cfg.attachTimeoutMs);
 
     if (j->contains("pidSelectionPolicy") && j->at("pidSelectionPolicy").is_string()) {
         std::string pol = j->at("pidSelectionPolicy").get<std::string>();

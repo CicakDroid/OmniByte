@@ -2,18 +2,18 @@
 // Logging/LoggingLoader.h — load LoggingConfig from JSON.
 
 #include "LoggingConfig.h"
-#include "../Common/ConfigLoader.h"
+#include <common/Serialization/JsonLoader.h>
 
 namespace omnibyte::dumper::config {
 
 inline LoggingConfig loadLoggingConfig(const std::string& path) {
-    auto j = loadJsonFile(path);
+    auto j = omnibyte::common::loadJsonFile(path);
     if (!j) return LoggingConfig::defaults();
 
     LoggingConfig cfg;
-    cfg.logLevel          = getOr<std::string>(*j, "logLevel", cfg.logLevel);
-    cfg.rotationMaxFiles  = getOr<uint32_t>(*j, "rotationMaxFiles", cfg.rotationMaxFiles);
-    cfg.crashReportOptIn  = getOr<bool>(*j, "crashReportOptIn", cfg.crashReportOptIn);
+    cfg.logLevel          = omnibyte::common::getOr<std::string>(*j, "logLevel", cfg.logLevel);
+    cfg.rotationMaxFiles  = omnibyte::common::getOr<uint32_t>(*j, "rotationMaxFiles", cfg.rotationMaxFiles);
+    cfg.crashReportOptIn  = omnibyte::common::getOr<bool>(*j, "crashReportOptIn", cfg.crashReportOptIn);
     return cfg;
 }
 

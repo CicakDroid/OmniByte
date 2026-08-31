@@ -1,8 +1,8 @@
 #pragma once
-// Common/ConfigLoader.h — shared JSON file loading utilities for all config modules.
+// common/Serialization/JsonLoader.h — shared JSON file loading utilities.
 //
 // Usage:
-//   auto j = omnibyte::dumper::config::loadJsonFile("file_limits.json");
+//   auto j = omnibyte::common::loadJsonFile("file_limits.json");
 //   if (j) { /* parse *j */ } else { /* use defaults */ }
 
 #include <nlohmann/json.hpp>
@@ -10,7 +10,7 @@
 #include <optional>
 #include <string>
 
-namespace omnibyte::dumper::config {
+namespace omnibyte::common {
 
 // Load a JSON file and return it as nlohmann::json.
 // Returns std::nullopt if the file doesn't exist or can't be parsed.
@@ -54,4 +54,4 @@ inline std::vector<std::string> getOr(const nlohmann::json& j,
     }
 }
 
-} // namespace omnibyte::dumper::config
+} // namespace omnibyte::common

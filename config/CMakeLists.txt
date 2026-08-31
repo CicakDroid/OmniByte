@@ -8,21 +8,16 @@ project(dumper_config LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# --- nlohmann/json via FetchContent (single-header) ---
-include(FetchContent)
-cmake_policy(SET CMP0135 NEW)
-FetchContent_Declare(
-    nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG        v3.11.3
-    GIT_SHALLOW    TRUE
-)
-set(JSON_BuildTests OFF CACHE INTERNAL "")
-set(JSON_Install OFF CACHE INTERNAL "")
-FetchContent_MakeAvailable(nlohmann_json)
+# --- nlohmann/json via omnibyte_serialization (single-source-of-truth) ---
+# nlohmann/json is fetched once in common/Serialization/CMakeLists.txt.
+# We re-use that target here so there is zero duplicate fetch.
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/Serialization/CMakeLists.txt)
 
 # Header-only — no static library needed, but provide an INTERFACE target
 # so downstream can: target_link_libraries(... dumper_config)
 add_library(dumper_config INTERFACE)
-target_include_directories(dumper_config INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(dumper_config INTERFACE nlohmann_json::nlohmann_json)
+target_include_directories(dumper_config INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common
+)
+target_link_libraries(dumper_config INTERFACE omnibyte_serialization)

@@ -2,7 +2,7 @@
 // UI/UILoader.h — load UIConfig from JSON.
 
 #include "UIConfig.h"
-#include "../Common/ConfigLoader.h"
+#include <common/Serialization/JsonLoader.h>
 #include <unordered_map>
 
 namespace omnibyte::dumper::config {
@@ -17,12 +17,12 @@ namespace {
 } // anonymous namespace
 
 inline UIConfig loadUIConfig(const std::string& path) {
-    auto j = loadJsonFile(path);
+    auto j = omnibyte::common::loadJsonFile(path);
     if (!j) return UIConfig::defaults();
 
     UIConfig cfg;
-    cfg.theme     = getOr<std::string>(*j, "theme", cfg.theme);
-    cfg.language  = getOr<std::string>(*j, "language", cfg.language);
+    cfg.theme     = omnibyte::common::getOr<std::string>(*j, "theme", cfg.theme);
+    cfg.language  = omnibyte::common::getOr<std::string>(*j, "language", cfg.language);
 
     if (j->contains("verbosity") && j->at("verbosity").is_string()) {
         std::string v = j->at("verbosity").get<std::string>();
