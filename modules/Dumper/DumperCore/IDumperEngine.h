@@ -15,6 +15,7 @@ enum class EngineType {
     Source2,
     Godot,
     GameMaker,
+    Cocos2d,
     Unknown
 };
 
