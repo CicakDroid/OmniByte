@@ -1,7 +1,7 @@
 #pragma once
 // ExportRegistry — Registry for export writers.
 // Maps format names to IExporter instances and routes export requests.
-#include "IExporter.h"
+#include "../IExporter/IExporter.h"
 #include <algorithm>
 #include <functional>
 #include <memory>

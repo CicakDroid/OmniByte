@@ -1,9 +1,9 @@
 #pragma once
 // HeaderWriter — Generates C/C++ struct declarations from DumpResult.
 // Output format: C headers with structs, fields, padding, and size comments.
-#include "../ExportCore/IExporter/IExporter.h"
-#include "../ExportCore/SectionSplitter/SectionSplitter.h"
-#include "../../DumperCore/DumpResult.h"
+#include "../../ExportCore/IExporter/IExporter.h"
+#include "../../ExportCore/SectionSplitter/SectionSplitter.h"
+#include "../../../DumperCore/DumpResult.h"
 #include <fstream>
 #include <sstream>
 #include <iomanip>

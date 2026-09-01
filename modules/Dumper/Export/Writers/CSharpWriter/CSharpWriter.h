@@ -1,9 +1,9 @@
 #pragma once
 // CSharpWriter — Generates C# class declarations from DumpResult.
 // Output format: Il2CppDumper-style C# classes with fields and methods.
-#include "../ExportCore/IExporter/IExporter.h"
-#include "../ExportCore/SectionSplitter/SectionSplitter.h"
-#include "../../DumperCore/DumpResult.h"
+#include "../../ExportCore/IExporter/IExporter.h"
+#include "../../ExportCore/SectionSplitter/SectionSplitter.h"
+#include "../../../DumperCore/DumpResult.h"
 #include <fstream>
 #include <sstream>
 #include <iomanip>

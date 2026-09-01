@@ -1,9 +1,9 @@
 #pragma once
 // DummyDllWriter — Generates DummyDll-compatible C# assemblies from DumpResult.
 // Output format: .NET-style C# classes for tools like RuntimeDumper.
-#include "../ExportCore/IExporter/IExporter.h"
-#include "../ExportCore/SectionSplitter/SectionSplitter.h"
-#include "../../DumperCore/DumpResult.h"
+#include "../../ExportCore/IExporter/IExporter.h"
+#include "../../ExportCore/SectionSplitter/SectionSplitter.h"
+#include "../../../DumperCore/DumpResult.h"
 #include <fstream>
 #include <sstream>
 #include <map>

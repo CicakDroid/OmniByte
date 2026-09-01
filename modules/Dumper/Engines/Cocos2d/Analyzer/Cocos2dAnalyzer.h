@@ -5,6 +5,7 @@
 #include "../../../DumperCore/IDumperEngine.h"
 #include "../../../DumperCore/IEngineProfile.h"
 #include "../../../DumperCore/SharedUtils/SharedUtils.h"
+#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>

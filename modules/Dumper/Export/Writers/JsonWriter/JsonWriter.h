@@ -1,8 +1,8 @@
 #pragma once
 // JsonWriter — Generates structured JSON dump from DumpResult.
 // Output format: JSON with types, methods, fields, strings, metadata.
-#include "../ExportCore/IExporter/IExporter.h"
-#include "../../DumperCore/DumpResult.h"
+#include "../../ExportCore/IExporter/IExporter.h"
+#include "../../../DumperCore/DumpResult.h"
 #include <fstream>
 #include <sstream>
 #include <iomanip>

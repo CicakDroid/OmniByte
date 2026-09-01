@@ -1,7 +1,7 @@
 #pragma once
 // SectionSplitter — Splits DumpResult into logical sections for organized output.
 // Groups types by namespace/package, methods by declaring type, etc.
-#include "../../DumperCore/DumpResult.h"
+#include "../../../DumperCore/DumpResult.h"
 #include <algorithm>
 #include <map>
 #include <string>

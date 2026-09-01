@@ -2,7 +2,7 @@
 // IExporter — Base interface for all dump export writers.
 // Each writer (CSharp, JSON, Header, DummyDll) implements this interface
 // to convert DumpResult into a specific output format.
-#include "../../DumperCore/DumpResult.h"
+#include "../../../DumperCore/DumpResult.h"
 #include <memory>
 #include <string>
 #include <vector>
