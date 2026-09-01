@@ -1,8 +1,3 @@
-# Disassembler/backends/capstone-adapter — placeholder adapter for: capstone
-#
-# Stage 1 scaffolding only. This target compiles an empty stub so the build
-# graph is complete. Real backend wiring lives BELOW the marker and is
-# intentionally commented out — uncomment when the library is available.
 cmake_minimum_required(VERSION 3.22.1)
 
 project(disassembler_capstone LANGUAGES CXX)
@@ -10,12 +5,39 @@ project(disassembler_capstone LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(FetchContent)
+
+FetchContent_Declare(
+    capstone
+    GIT_REPOSITORY https://github.com/capstone-engine/capstone.git
+    GIT_TAG        5.0.9
+    GIT_SHALLOW    TRUE
+)
+
+set(CAPSTONE_BUILD_STATIC ON CACHE BOOL "" FORCE)
+set(CAPSTONE_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_BUILD_CSTOOL OFF CACHE BOOL "" FORCE)
+set(CAPSTONE_ARM_SUPPORT ON CACHE BOOL "" FORCE)
+set(CAPSTONE_ARM64_SUPPORT ON CACHE BOOL "" FORCE)
+set(CAPSTONE_X86_SUPPORT ON CACHE BOOL "" FORCE)
+set(CAPSTONE_MIPS_SUPPORT ON CACHE BOOL "" FORCE)
+set(CAPSTONE_PPC_SUPPORT ON CACHE BOOL "" FORCE)
+set(CAPSTONE_SPARC_SUPPORT ON CACHE BOOL "" FORCE)
+set(CAPSTONE_SYSZ_SUPPORT ON CACHE BOOL "" FORCE)
+set(CAPSTONE_XCORE_SUPPORT ON CACHE BOOL "" FORCE)
+set(CAPSTONE_M68K_SUPPORT ON CACHE BOOL "" FORCE)
+set(CAPSTONE_TMS320C64X_SUPPORT ON CACHE BOOL "" FORCE)
+set(CAPSTONE_M680X_SUPPORT ON CACHE BOOL "" FORCE)
+set(CAPSTONE_EVM_SUPPORT ON CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(capstone)
+
 add_library(disassembler_capstone STATIC disassembler_capstone.cpp)
 
-# ===== PLACEHOLDER — real backend wiring (uncomment when capstone is available) =====
-# find_package(PkgConfig REQUIRED)
-# pkg_check_modules(disassembler_capstone_PC REQUIRED capstone)
-# add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/vendored  disassembler_capstone-vendored)
-# ExternalProject_Add(disassembler_capstone_ep ...)
-# target_include_directories(disassembler_capstone PUBLIC ${disassembler_capstone_PC_INCLUDE_DIRS})
-# target_link_libraries(disassembler_capstone PUBLIC ${disassembler_capstone_PC_LIBRARIES})
+target_link_libraries(disassembler_capstone PUBLIC capstone-static)
+
+target_include_directories(disassembler_capstone PUBLIC
+    ${capstone_SOURCE_DIR}/include
+    ${capstone_BINARY_DIR}/include
+)
