@@ -10,7 +10,7 @@
 
 HydraDis membutuhkan 7 backend adapter (Capstone, rizin-native, rz-ghidra, LIEF, Triton, Z3, CVC5). Semua backend ini butuh kontrak interface yang konsisten supaya:
 1. Backend bisa di-swap tanpa mengubah caller
-2. Factory pattern bisa worked dengan统一 interface
+2. Factory pattern bisa jalan dengan interface yang seragam
 3. Testing bisa pakai mock implementations
 
 Tahap 0 mendefinisikan 3 kontrak dasar sebelum backend ditulis di atasnya.
@@ -206,12 +206,45 @@ Interface yang sudah ada di `engine-core/HydraDis/Plugin/Enhanced/SymbolicExecut
 
 | Method | Z3 support | CVC5 support | Gap? |
 |--------|-----------|-------------|------|
-| `addConstraint(SMT-LIB2 string)` | ✅ native | ✅ native | None |
-| `check(timeoutMs)` | ✅ | ✅ | None |
-| `getModel()` | ✅ | ✅ | None |
-| `push()/pop()` | ✅ | ✅ | None |
+| `addConstraint(SMT-LIB2 string)` | ✅ native (`from_string()`) | ✅ via `assertFormula()` + parse | None |
+| `check(timeoutMs)` | ✅ `check()` | ✅ `checkSat()` | None |
+| `getModel()` | ✅ `get_model()` | ✅ `getModel()` | None |
+| `push()/pop()` | ✅ `push()` / `pop()` | ✅ `push()` / `pop()` | None |
 
-**No gaps found** — existing interface is sufficient for both Z3 and CVC5.
+### Z3 C++ API Mapping
+
+Source: https://z3prover.github.io/api/html/classz3_1_1solver.html
+
+| ISolverBackend method | Z3 C++ API | Notes |
+|----------------------|------------|-------|
+| `addConstraint(smtLib2)` | `z3::solver::from_string(const char* s)` | Parses SMT-LIB2 string directly |
+| `check(timeoutMs)` | `z3::solver::check()` | Returns `z3::check_result` (sat/unsat/unknown) |
+| `getModel()` | `z3::solver::get_model()` | Returns `z3::model` |
+| `push()` | `z3::solver::push()` | Creates backtracking point |
+| `pop()` | `z3::solver::pop(unsigned n=1)` | Backtracks n levels |
+| `reset()` | `z3::solver::reset()` | Removes all assertions |
+
+### CVC5 C++ API Mapping
+
+Source: https://cvc5.github.io/docs/cvc5-1.3.0/api/cpp/cpp.html
+Source: https://cvc5.github.io/docs/cvc5-1.0.9/api/cpp/solver.html
+
+| ISolverBackend method | CVC5 C++ API | Notes |
+|----------------------|--------------|-------|
+| `addConstraint(smtLib2)` | `cvc5::Solver::assertFormula(const Term&)` | Requires parsing SMT-LIB2 to Term first |
+| `check(timeoutMs)` | `cvc5::Solver::checkSat()` | Returns `cvc5::Result` (sat/unsat/unknown) |
+| `getModel()` | `cvc5::Solver::getModel(const vector<Sort>&, const vector<Term>&)` | Returns string representation |
+| `push()` | `cvc5::Solver::push(uint32_t nscopes = 1)` | Pushes scope level |
+| `pop()` | `cvc5::Solver::pop(uint32_t nscopes = 1)` | Pops scope level |
+| `reset()` | `cvc5::Solver::resetAssertions()` | Removes all assertions |
+
+### Conclusion
+
+**No gaps found** — existing interface is sufficient for both Z3 and CVC5. Both solvers support:
+- SMT-LIB2 constraint input (Z3 natively, CVC5 via Term parsing)
+- Satisfiability checking with timeout support
+- Model extraction after SAT result
+- Push/pop scope management for path-sensitive analysis
 
 ---
 
@@ -220,12 +253,16 @@ Interface yang sudah ada di `engine-core/HydraDis/Plugin/Enhanced/SymbolicExecut
 - **IEngineProfile.h** — pola interface yang diikuti (`modules/Dumper/DumperCore/IEngineProfile.h`)
 - **IDumperEngine.h** — pola interface yang diikuti (`modules/Dumper/DumperCore/IDumperEngine.h`)
 - **ISolverBackend.h** — kontrak existing untuk solver backend (`engine-core/HydraDis/Plugin/Enhanced/SymbolicExecution/ISolverBackend.h`)
+- **Z3 C++ API** — https://z3prover.github.io/api/html/classz3_1_1solver.html
+- **CVC5 C++ API** — https://cvc5.github.io/docs/cvc5-1.3.0/api/cpp/cpp.html
+- **CVC5 Solver API** — https://cvc5.github.io/docs/cvc5-1.0.9/api/cpp/solver.html
 
 ---
 
 ## Status
 
-- [x] IDisassembler.h — written
+- [x] IDisassembler.h — written (revised: added DisassemblerArch enum + arch() method)
 - [x] IParser.h — written
 - [x] IDecompiler.h — written
+- [x] ISolverBackend.h Gap Analysis — verified with Z3/CVC5 documentation citations
 - [ ] Awaiting user review & approval

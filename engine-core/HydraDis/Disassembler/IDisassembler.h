@@ -5,7 +5,10 @@
 // (ARM, ARM64, x86, dst) -- caller tidak perlu tahu.
 //
 // Design principles:
-//   - Arch-agnostic: Instruction struct tidak expose detail Capstone-specific
+//   - Instance-per-arch: satu IDisassembler instance = satu arsitektur target.
+//     Caller (Detector/Analyzer) sudah tahu arch dari ELF e_machine header
+//     via IParser SEBELUM panggil disassemble(), jadi arch di-pass ke
+//     constructor backend, bukan ke disassemble().
 //   - Minimal: hanya fungsi disassemble() -- extension point lain ditambah saat
 //     ada kebutuhan nyata, bukan antisipasi
 //   - Ikuti pola IEngineProfile.h / IDumperEngine.h: abstract interface,
@@ -19,6 +22,32 @@
 namespace omnibyte::hydradis {
 
 // ── Data types ─────────────────────────────────────────────────────
+
+/// Architecture target untuk disassembly.
+/// Satu instance IDisassembler = satu arch. Caller tentukan arch saat
+/// construct backend via factory, bukan saat panggil disassemble().
+///
+/// Alasan Opsi A (instance-per-arch) dipilih:
+/// - Detector/Analyzer sudah tahu arch dari ELF e_machine header via IParser
+///   SEBELUM panggil disassemble()
+/// - Backend Capstone butuh arch+mode saat cs_open(), tidak bisa diubah setelah
+/// - Cleaner API: tidak perlu pass arch di setiap panggilan disassemble()
+/// - Ikuti pola "segitiga terbalik" -- arch knowledge di atas, spesialisasi di bawah
+enum class DisassemblerArch {
+    ARM,        // ARM 32-bit (ARM + Thumb mode)
+    ARM64,      // AArch64
+    x86,        // Intel x86 32-bit
+    x86_64,     // Intel x86 64-bit
+    MIPS,       // MIPS
+    PPC,        // PowerPC
+    SPARC,      // SPARC
+    SystemZ,    // IBM System/z
+    XCore,      // XCore
+    M68K,       // Motorola 68000
+    TMS320C64X, // TMS320C64x
+    M680X,      // Motorola 68000 family
+    EVM,        // Ethereum Virtual Machine
+};
 
 /// Satu instruksi hasil disassembly.
 /// Sengaja arch-agnostic -- backend Capstone yang isi field-field ini
@@ -45,7 +74,8 @@ struct DisassemblyResult {
 /// Capstone-adapter, Ghidra-adapter, dll implement ini.
 ///
 /// Usage:
-///   std::unique_ptr<IDisassembler> disasm = /* factory */;
+///   // Caller sudah tahu arch dari IParser->parseFile().header.machine
+///   std::unique_ptr<IDisassembler> disasm = factory->create(DisassemblerArch::ARM64);
 ///   auto result = disasm->disassemble(codeBytes, 0x10000);
 ///   for (auto& instr : result.instructions) { ... }
 class IDisassembler {
@@ -54,6 +84,10 @@ public:
 
     /// Nama backend (mis. "capstone", "ghidra") -- untuk logging/diagnostic.
     virtual std::string name() const = 0;
+
+    /// Architecture yang di-disassemble oleh instance ini.
+    /// Dipilih saat construction, tidak berubah sepanjang lifetime.
+    virtual DisassemblerArch arch() const = 0;
 
     /// Decode buffer of bytes jadi list instruksi.
     ///
