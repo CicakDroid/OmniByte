@@ -26,16 +26,30 @@ struct AOBPattern {
 
 // ── Kontrak profile per-versi SDK ──
 //
-// Dua method utama:
+// Tiga method utama (resolution paths):
 //   - offsetOf(key):  offset statis dalam struct/header (64-bit / arm64-v8a).
 //                     Dipakai dari Analyzer (static analysis, baca file/binary).
 //                     Contoh: "UObjectFlags" offset, "FChunkedFixedUObjectArray.ObjectsOffset".
+//                     Return 0 jika engine tidak pakai mekanisme ini (mis. Cocos2d).
 //
 //   - patternFor(key): AOB pattern untuk resolve global pointer di runtime.
 //                      Dipakai dari Resolver (live process, pattern scan).
 //                      Contoh: "GNamesPattern", "GObjectsPattern", "GWorldPattern".
 //                      Default return nullopt -- engine yg resolve globals lewat
 //                      symbol export/xDL (IL2CPP, Mono, Godot, Source) tidak perlu override.
+//
+//   - symbolFor(key): symbol name untuk resolve via dlsym/ELF symbol table.
+//                     Dipakai dari Resolver (live process, xdl_sym / dlsym).
+//                     Contoh: "luaL_loadbuffer", "cc::AssetManager::getInstance".
+//                     Default return nullopt -- engine yg pakai offset statis/AOB
+//                      (UE, IL2CPP, Godot) tidak perlu override.
+//                     Return value dikirim ke runtime/SymbolResolver (xdl-adapter).
+//
+// Resolution path per engine family:
+//   UE:           patternFor() -> AOB scan -> RIP-relative extract
+//   IL2CPP/Mono:  patternFor() -> global pointer via export / xDL
+//   Godot/Source: patternFor() -> symbol export via xDL
+//   Cocos2d:      symbolFor() -> dlsym / ELF dynamic symbol table
 //
 // Analyzer/Resolver TIDAK BOLEH hardcode offset struct di logic utamanya --
 // semua offset harus lewat profile ini, supaya nambah versi baru = tambah
@@ -62,6 +76,18 @@ public:
     // Dipakai dari Resolver, bukan Analyzer.
     virtual std::optional<AOBPattern> patternFor(const std::string& patternKey) const {
         return std::nullopt;
+    }
+
+    // Symbol lookup: untuk engine yang resolve alamat via dlsym/ELF symbol
+    // table saat runtime, bukan offset statis (mis. Cocos2d-x, Cocos Creator).
+    // Return symbol name (mangled atau demangled sesuai konvensi engine)
+    // yang nanti dicari runtime/SymbolResolver (xDL).
+    //
+    // Return nullopt kalau engine ini tidak butuh symbol-based resolution (default).
+    // Contoh key: "luaL_loadbuffer", "FileUtils::getInstance", "cc::AssetManager::getInstance".
+    // Dipakai dari Resolver, bukan Analyzer.
+    virtual std::optional<std::string> symbolFor(const std::string& key) const {
+        return std::nullopt; // default: engine yang tidak butuh ini tidak perlu override
     }
 
     virtual uint64_t offsetOf32(const std::string& fieldKey) const { return 0; }
