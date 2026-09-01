@@ -1,5 +1,3 @@
-// ExportCore/IExporter placeholder.
-// Stage 1 scaffolding only: no logic yet.
-extern "C" int dumper_export_iexporter_placeholder_init() {
-    return 0;
-}
+// ExportCore/IExporter — Base interface implementation.
+// No logic needed here; IExporter is a pure virtual interface defined in header.
+#include "IExporter.h"

@@ -1,5 +1,2 @@
-// CSharpWriter placeholder.
-// Stage 1 scaffolding only: no logic yet.
-extern "C" int dumper_writer_csharp_placeholder_init() {
-    return 0;
-}
+// CSharpWriter — C# class export implementation.
+#include "CSharpWriter.h"
