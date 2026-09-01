@@ -161,7 +161,7 @@ std::vector<uint8_t> HrtngDecrypt::rot13(const std::vector<uint8_t>& data) {
 
 std::vector<uint8_t> HrtngDecrypt::addConstant(const std::vector<uint8_t>& data, int8_t delta) {
     std::vector<uint8_t> result(data.size());
-    for (size_t = 0; i < data.size(); ++i) {
+    for (size_t i = 0; i < data.size(); ++i) {
         result[i] = static_cast<uint8_t>(data[i] + delta);
     }
     return result;

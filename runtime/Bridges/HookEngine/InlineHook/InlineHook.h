@@ -3,6 +3,7 @@
 // Source: https://github.com/bytedance/android-inline-hook (MIT)
 
 #include <cstdint>
+#include <vector>
 
 namespace omnibyte::hook {
 
