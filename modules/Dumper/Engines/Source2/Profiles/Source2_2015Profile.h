@@ -1,6 +1,8 @@
 #pragma once
 // ── Profiles/Source2_2015Profile.h ────────────────────────────────
-// Skeleton -- offset Source 2 2015 belum diisi (TODO).
+// Source 2 resource file header — version-agnostic (same across all engine versions).
+// Source: ValveResourceFormat/ValveResourceFormat @ master, Resource.cs
+// KnownHeaderVersion = 12, header structure identical 2015–2025.
 #include "../../../DumperCore/IEngineProfile.h"
 #include <cstddef>
 #include <cstdint>
@@ -12,19 +14,36 @@ class Source2_2015Profile : public IEngineProfile {
 public:
     std::string version() const override { return "2015"; }
 
+    // Source 2 resource header fields (identical across all engine versions).
+    // Header: FileSize(4) + HeaderVersion(2) + Version(2) + BlockOffset(4) + BlockCount(4) = 20 bytes.
+    // Block entry: BlockType(4) + Offset(4) + Size(4) = 12 bytes.
     uint64_t offsetOf(const std::string& key) const override {
-        (void)key;
-        return 0; // TODO: isi offset header .vpk_c 2015
+        if (key == "FileSize")            return 0x00;  // uint32
+        if (key == "HeaderVersion")       return 0x04;  // uint16, always 12
+        if (key == "Version")             return 0x06;  // uint16, file type version
+        if (key == "BlockOffset")         return 0x08;  // uint32, offset to block table
+        if (key == "BlockCount")          return 0x0C;  // uint32, number of blocks
+        if (key == "HeaderSize")          return 0x14;  // total header size (20 bytes)
+        if (key == "BlockEntry.Size")     return 12;    // per-block entry size
+        if (key == "BlockEntry.BlockType")return 0;     // +0x00 within entry
+        if (key == "BlockEntry.Offset")   return 4;     // +0x04 within entry
+        if (key == "BlockEntry.Size")     return 8;     // +0x08 within entry
+        return 0;
     }
 
     size_t structSize(const std::string& key) const override {
-        (void)key;
-        return 0; // TODO
+        if (key == "ResourceHeader")      return 0x14;  // 20 bytes
+        if (key == "BlockEntry")          return 12;    // 12 bytes per block
+        return 0;
     }
 
+    // Validate: check HeaderVersion == 12 (KnownHeaderVersion).
+    // Source: ValveResourceFormat Resource.cs — throws if != 12.
     bool validate(const uint8_t* headerBytes, size_t len) const override {
-        (void)headerBytes;
-        return len >= 8; // TODO: cek header .vpk_c 2015
+        if (len < 8) return false;
+        // HeaderVersion at offset 0x04 (little-endian uint16)
+        uint16_t headerVersion = headerBytes[0x04] | (headerBytes[0x05] << 8);
+        return headerVersion == 12;
     }
 };
 
