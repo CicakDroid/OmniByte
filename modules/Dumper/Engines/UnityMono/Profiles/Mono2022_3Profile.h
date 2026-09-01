@@ -3,7 +3,7 @@
 // Unity 2022.3 LTS ships Mono 2022.3.x (based on Mono runtime ~6.12.x).
 // Struct layouts derived from mono/mono@mono-2022-07 tag:
 //   metadata-internals.h, class-private-definition.h, class-internals.h
-// Target: 64-bit (Android arm64-v8a).
+// Targets: 64-bit (arm64-v8a), 32-bit (armeabi-v7a).
 //
 // NOTE: Unity maintains a fork of Mono. Struct layouts here match
 // the upstream mono/mono struct definitions. If Unity patches fields,
@@ -199,12 +199,153 @@ public:
         return it != kSizes.end() ? it->second : 0;
     }
 
+    uint64_t offsetOf32(const std::string& key) const override {
+        static const std::unordered_map<std::string, uint64_t> kOffsets = {
+            // ── MonoImage (32-bit, armeabi-v7a) ────────────────────
+            // Pointers shrink 8→4; MonoStreamHeader stays 8 (2× guint32).
+            // MonoTableInfo shrinks 16→12 (3× guint32).
+            // NOTE: Unity fork may add fields not in upstream — offsets marked
+            // approx need runtime verification.
+            {"MonoImage_sizeof",                0x228},  // approx from upstream32 layout
+
+            {"MonoImage_raw_data",              0x08},   // char*
+            {"MonoImage_raw_data_len",          0x0C},   // guint32
+
+            {"MonoImage_name",                  0x18},   // char*
+            {"MonoImage_filename",              0x1C},   // char*
+            {"MonoImage_assembly_name",         0x20},   // const char*
+            {"MonoImage_module_name",           0x24},   // const char*
+            {"MonoImage_version",               0x2C},   // char*
+            {"MonoImage_guid",                  0x34},   // char*
+
+            {"MonoImage_md_version_major",      0x38},   // gint16
+            {"MonoImage_md_version_minor",      0x3A},   // gint16
+
+            {"MonoImage_heap_strings",          0x44},   // MonoStreamHeader (8 bytes)
+            {"MonoImage_heap_us",               0x4C},   // MonoStreamHeader
+            {"MonoImage_heap_blob",             0x54},   // MonoStreamHeader
+            {"MonoImage_heap_guid",             0x5C},   // MonoStreamHeader
+            {"MonoImage_heap_tables",           0x64},   // MonoStreamHeader
+
+            {"MonoImage_tables_base",           0x6C},   // const char*
+            {"MonoImage_tables",                0x70},   // MonoTableInfo[64]
+            {"MonoTableInfo_sizeof",            0x0C},   // 12 bytes on 32-bit
+
+            {"MonoImage_assembly",              0x1F8},  // approx; Unity fork offset
+
+            // ── MonoClass (32-bit) ─────────────────────────────────
+            // All pointers 4 bytes; MonoType 8 bytes (vs 16 on 64-bit).
+            {"MonoClass_sizeof",                0xA0},
+
+            {"MonoClass_element_class",         0x00},   // MonoClass*
+            {"MonoClass_cast_class",            0x04},   // MonoClass*
+            {"MonoClass_supertypes",            0x08},   // MonoClass**
+            {"MonoClass_idepth",                0x0C},   // guint16
+            {"MonoClass_rank",                  0x0E},   // guint8
+            {"MonoClass_class_kind",            0x0F},   // guint8
+            {"MonoClass_instance_size",         0x10},   // int
+
+            {"MonoClass_bitfield1",             0x14},   // packed bits
+            {"MonoClass_min_align",             0x18},   // guint8
+            {"MonoClass_bitfield2",             0x19},
+            {"MonoClass_bitfield3",             0x1A},
+            {"MonoClass_bitfield4",             0x1B},
+
+            {"MonoClass_parent",                0x1C},   // MonoClass*
+            {"MonoClass_nested_in",             0x20},   // MonoClass*
+            {"MonoClass_image",                 0x24},   // MonoImage*
+            {"MonoClass_name",                  0x28},   // const char*
+            {"MonoClass_name_space",            0x2C},   // const char*
+
+            {"MonoClass_type_token",            0x30},   // guint32
+            {"MonoClass_vtable_size",           0x34},   // int
+
+            {"MonoClass_interface_count",       0x38},   // guint16
+            {"MonoClass_interface_id",          0x3C},   // guint32
+            {"MonoClass_max_interface_id",      0x40},   // guint32
+            {"MonoClass_interface_offsets_count",0x44},  // guint16
+            {"MonoClass_interfaces_packed",     0x48},   // MonoClass**
+            {"MonoClass_interface_offsets_packed",0x4C}, // guint16*
+            {"MonoClass_interface_bitmap",      0x50},   // guint8*
+            {"MonoClass_interfaces",            0x54},   // MonoClass**
+
+            {"MonoClass_sizes",                 0x58},   // union (4 bytes)
+            {"MonoClass_flags",                 0x5C},   // guint32
+            {"MonoClass_field_first",           0x60},   // guint32
+            {"MonoClass_field_count",           0x64},   // guint32
+            {"MonoClass_method_first",          0x68},   // guint32
+            {"MonoClass_method_count",          0x6C},   // guint32
+
+            {"MonoClass_ref_info_handle",       0x70},   // guint32
+            {"MonoClass_marshal_info",          0x74},   // MonoMarshalType*
+
+            {"MonoClass_fields",                0x78},   // MonoClassField*
+            {"MonoClass_methods",               0x7C},   // MonoMethod**
+
+            {"MonoClass_this_arg",              0x80},   // MonoType (8 bytes)
+            {"MonoClass__byval_arg",            0x88},   // MonoType (8 bytes)
+
+            {"MonoClass_generic_class",         0x90},   // MonoGenericClass*
+            {"MonoClass_generic_container",     0x94},   // MonoGenericContainer*
+            {"MonoClass_gc_descr",              0x98},   // MonoGCDescriptor
+            {"MonoClass_runtime_info",          0x9C},   // MonoClassRuntimeInfo*
+            {"MonoClass_next_class_cache",      0xA0},   // MonoClass* (end of struct)
+            {"MonoClass_vtable",                0xA4},   // MonoMethod**
+            {"MonoClass_ext",                   0xA8},   // MonoClassExt*
+
+            // ── MonoClassField (32-bit) ────────────────────────────
+            // Pointers 4 bytes; sizeof shrinks 0x20→0x10.
+            {"MonoClassField_sizeof",           0x10},
+
+            {"MonoClassField_type",             0x00},   // MonoType* (inline, 8 bytes)
+            {"MonoClassField_name",             0x04},   // const char*
+            {"MonoClassField_parent",           0x08},   // MonoClass*
+            {"MonoClassField_offset",           0x0C},   // int
+
+            // ── MonoMethod (32-bit) ────────────────────────────────
+            // Pointers 4 bytes; sizeof shrinks 0x28→0x1C.
+            {"MonoMethod_sizeof",               0x1C},
+
+            {"MonoMethod_flags",                0x00},   // guint16
+            {"MonoMethod_iflags",               0x02},   // guint16
+            {"MonoMethod_token",                0x04},   // guint32
+            {"MonoMethod_klass",                0x08},   // MonoClass*
+            {"MonoMethod_signature",            0x0C},   // MonoMethodSignature*
+            {"MonoMethod_name",                 0x10},   // const char*
+            {"MonoMethod_bitfields",            0x14},   // packed bits
+            {"MonoMethod_slot",                 0x18},   // signed int
+
+            // ── MonoType (32-bit) ──────────────────────────────────
+            // sizeof shrinks 0x10→0x08.
+            {"MonoType_sizeof",                 0x08},
+
+            {"MonoType_data",                   0x00},   // union (4 bytes)
+            {"MonoType_attrs",                  0x04},   // guint16
+            {"MonoType_type",                   0x06},   // guint8 (bitfield)
+            {"MonoType_num_mods",               0x07},   // guint6 (bitfield)
+            {"MonoType_byref",                  0x07},   // guint1 (packed)
+            {"MonoType_pinned",                 0x07},   // guint1 (packed)
+        };
+        auto it = kOffsets.find(key);
+        return it != kOffsets.end() ? it->second : 0;
+    }
+
+    size_t structSize32(const std::string& key) const override {
+        static const std::unordered_map<std::string, size_t> kSizes = {
+            {"MonoImage",        0x228},
+            {"MonoClass",        0xA0},
+            {"MonoClassField",   0x10},
+            {"MonoMethod",       0x1C},
+            {"MonoType",         0x08},
+            {"MonoStreamHeader", 0x08},
+            {"MonoTableInfo",    0x0C},
+        };
+        auto it = kSizes.find(key);
+        return it != kSizes.end() ? it->second : 0;
+    }
+
     bool validate(const uint8_t* headerBytes, size_t len) const override {
-        // Mono metadata validation: check that we can read at least a few bytes
-        // and that the image name pointer looks reasonable.
         if (len < 0x80) return false;
-        // Heuristic: name pointer should be within the image or point to a string
-        // We do a basic sanity check — not a full validation.
         return true;
     }
 };

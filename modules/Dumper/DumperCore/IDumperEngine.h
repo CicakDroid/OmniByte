@@ -12,12 +12,9 @@ enum class EngineType {
     UnrealEngine,
     UnityIL2CPP,
     UnityMono,
-    Source,
     Source2,
     Godot,
-    CryEngine,
     GameMaker,
-    Unigine,
     Unknown
 };
 

@@ -3,7 +3,7 @@
 // Unity 6000.1 ships Mono ~6000.1.x (based on .NET 6 runtime).
 // Struct layouts derived from mono/mono@mono-6000.1 tag:
 //   metadata-internals.h, class-private-definition.h, class-internals.h
-// Target: 64-bit (Android arm64-v8a).
+// Targets: 64-bit (arm64-v8a), 32-bit (armeabi-v7a).
 //
 // Core structs stable vs 6000.0. Minor additions in MonoImage for AOT.
 // MonoClass/MonoMethod/MonoClassField offsets unchanged.
@@ -151,6 +151,138 @@ public:
             {"MonoType",       0x10},
             {"MonoStreamHeader", 0x08},
             {"MonoTableInfo",  0x10},
+        };
+        auto it = kSizes.find(key);
+        return it != kSizes.end() ? it->second : 0;
+    }
+
+    uint64_t offsetOf32(const std::string& key) const override {
+        static const std::unordered_map<std::string, uint64_t> kOffsets = {
+            {"MonoImage_sizeof",                0x228},
+
+            {"MonoImage_raw_data",              0x08},
+            {"MonoImage_raw_data_len",          0x0C},
+
+            {"MonoImage_name",                  0x18},
+            {"MonoImage_filename",              0x1C},
+            {"MonoImage_assembly_name",         0x20},
+            {"MonoImage_module_name",           0x24},
+            {"MonoImage_version",               0x2C},
+            {"MonoImage_guid",                  0x34},
+
+            {"MonoImage_md_version_major",      0x38},
+            {"MonoImage_md_version_minor",      0x3A},
+
+            {"MonoImage_heap_strings",          0x44},
+            {"MonoImage_heap_us",               0x4C},
+            {"MonoImage_heap_blob",             0x54},
+            {"MonoImage_heap_guid",             0x5C},
+            {"MonoImage_heap_tables",           0x64},
+
+            {"MonoImage_tables_base",           0x6C},
+            {"MonoImage_tables",                0x70},
+            {"MonoTableInfo_sizeof",            0x0C},
+
+            {"MonoImage_assembly",              0x1F8},
+
+            {"MonoClass_sizeof",                0xA0},
+
+            {"MonoClass_element_class",         0x00},
+            {"MonoClass_cast_class",            0x04},
+            {"MonoClass_supertypes",            0x08},
+            {"MonoClass_idepth",                0x0C},
+            {"MonoClass_rank",                  0x0E},
+            {"MonoClass_class_kind",            0x0F},
+            {"MonoClass_instance_size",         0x10},
+
+            {"MonoClass_bitfield1",             0x14},
+            {"MonoClass_min_align",             0x18},
+            {"MonoClass_bitfield2",             0x19},
+            {"MonoClass_bitfield3",             0x1A},
+            {"MonoClass_bitfield4",             0x1B},
+
+            {"MonoClass_parent",                0x1C},
+            {"MonoClass_nested_in",             0x20},
+            {"MonoClass_image",                 0x24},
+            {"MonoClass_name",                  0x28},
+            {"MonoClass_name_space",            0x2C},
+
+            {"MonoClass_type_token",            0x30},
+            {"MonoClass_vtable_size",           0x34},
+
+            {"MonoClass_interface_count",       0x38},
+            {"MonoClass_interface_id",          0x3C},
+            {"MonoClass_max_interface_id",      0x40},
+            {"MonoClass_interface_offsets_count",0x44},
+            {"MonoClass_interfaces_packed",     0x48},
+            {"MonoClass_interface_offsets_packed",0x4C},
+            {"MonoClass_interface_bitmap",      0x50},
+            {"MonoClass_interfaces",            0x54},
+
+            {"MonoClass_sizes",                 0x58},
+            {"MonoClass_flags",                 0x5C},
+            {"MonoClass_field_first",           0x60},
+            {"MonoClass_field_count",           0x64},
+            {"MonoClass_method_first",          0x68},
+            {"MonoClass_method_count",          0x6C},
+
+            {"MonoClass_ref_info_handle",       0x70},
+            {"MonoClass_marshal_info",          0x74},
+
+            {"MonoClass_fields",                0x78},
+            {"MonoClass_methods",               0x7C},
+
+            {"MonoClass_this_arg",              0x80},
+            {"MonoClass__byval_arg",            0x88},
+
+            {"MonoClass_generic_class",         0x90},
+            {"MonoClass_generic_container",     0x94},
+            {"MonoClass_gc_descr",              0x98},
+            {"MonoClass_runtime_info",          0x9C},
+            {"MonoClass_next_class_cache",      0xA0},
+            {"MonoClass_vtable",                0xA4},
+            {"MonoClass_ext",                   0xA8},
+
+            {"MonoClassField_sizeof",           0x10},
+
+            {"MonoClassField_type",             0x00},
+            {"MonoClassField_name",             0x04},
+            {"MonoClassField_parent",           0x08},
+            {"MonoClassField_offset",           0x0C},
+
+            {"MonoMethod_sizeof",               0x1C},
+
+            {"MonoMethod_flags",                0x00},
+            {"MonoMethod_iflags",               0x02},
+            {"MonoMethod_token",                0x04},
+            {"MonoMethod_klass",                0x08},
+            {"MonoMethod_signature",            0x0C},
+            {"MonoMethod_name",                 0x10},
+            {"MonoMethod_bitfields",            0x14},
+            {"MonoMethod_slot",                 0x18},
+
+            {"MonoType_sizeof",                 0x08},
+
+            {"MonoType_data",                   0x00},
+            {"MonoType_attrs",                  0x04},
+            {"MonoType_type",                   0x06},
+            {"MonoType_num_mods",               0x07},
+            {"MonoType_byref",                  0x07},
+            {"MonoType_pinned",                 0x07},
+        };
+        auto it = kOffsets.find(key);
+        return it != kOffsets.end() ? it->second : 0;
+    }
+
+    size_t structSize32(const std::string& key) const override {
+        static const std::unordered_map<std::string, size_t> kSizes = {
+            {"MonoImage",        0x228},
+            {"MonoClass",        0xA0},
+            {"MonoClassField",   0x10},
+            {"MonoMethod",       0x1C},
+            {"MonoType",         0x08},
+            {"MonoStreamHeader", 0x08},
+            {"MonoTableInfo",    0x0C},
         };
         auto it = kSizes.find(key);
         return it != kSizes.end() ? it->second : 0;
