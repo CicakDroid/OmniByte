@@ -1,0 +1,9 @@
+# AlbatrossAndroid — Java/ART hooking.
+cmake_minimum_required(VERSION 3.22.1)
+
+project(java_hook LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_library(java_hook STATIC JavaHook.cpp)
