@@ -15,15 +15,15 @@ public:
     std::string version() const override { return "2015"; }
 
     // Source 2 resource header fields (identical across all engine versions).
-    // Header: FileSize(4) + HeaderVersion(2) + Version(2) + BlockOffset(4) + BlockCount(4) = 20 bytes.
+    // Fixed-offset header: 16 bytes (0x10). Block table position is dynamic
+    // via Reader.BaseStream.Position += blockOffset - 8 (not a fixed offset).
     // Block entry: BlockType(4) + Offset(4) + Size(4) = 12 bytes.
     uint64_t offsetOf(const std::string& key) const override {
         if (key == "FileSize")            return 0x00;  // uint32
         if (key == "HeaderVersion")       return 0x04;  // uint16, always 12
         if (key == "Version")             return 0x06;  // uint16, file type version
-        if (key == "BlockOffset")         return 0x08;  // uint32, offset to block table
+        if (key == "BlockOffset")         return 0x08;  // uint32, offset to block table (runtime-calculated)
         if (key == "BlockCount")          return 0x0C;  // uint32, number of blocks
-        if (key == "HeaderSize")          return 0x14;  // total header size (20 bytes)
         if (key == "BlockEntry.Size")     return 12;    // per-block entry size
         if (key == "BlockEntry.BlockType")return 0;     // +0x00 within entry
         if (key == "BlockEntry.Offset")   return 4;     // +0x04 within entry
@@ -32,7 +32,7 @@ public:
     }
 
     size_t structSize(const std::string& key) const override {
-        if (key == "ResourceHeader")      return 0x14;  // 20 bytes
+        if (key == "ResourceHeader")      return 0x10;  // 16 bytes fixed-offset header
         if (key == "BlockEntry")          return 12;    // 12 bytes per block
         return 0;
     }

@@ -18,9 +18,8 @@ public:
         if (key == "FileSize")            return 0x00;  // uint32
         if (key == "HeaderVersion")       return 0x04;  // uint16, always 12
         if (key == "Version")             return 0x06;  // uint16, file type version
-        if (key == "BlockOffset")         return 0x08;  // uint32, offset to block table
+        if (key == "BlockOffset")         return 0x08;  // uint32, offset to block table (runtime-calculated)
         if (key == "BlockCount")          return 0x0C;  // uint32, number of blocks
-        if (key == "HeaderSize")          return 0x14;  // total header size (20 bytes)
         if (key == "BlockEntry.Size")     return 12;    // per-block entry size
         if (key == "BlockEntry.BlockType")return 0;
         if (key == "BlockEntry.Offset")   return 4;
@@ -29,7 +28,7 @@ public:
     }
 
     size_t structSize(const std::string& key) const override {
-        if (key == "ResourceHeader")      return 0x14;
+        if (key == "ResourceHeader")      return 0x10;  // 16 bytes fixed-offset header
         if (key == "BlockEntry")          return 12;
         return 0;
     }

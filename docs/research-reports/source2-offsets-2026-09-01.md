@@ -39,7 +39,8 @@ HeaderVersion = Reader.ReadUInt16();      // offset 0x04
 Version = Reader.ReadUInt16();            // offset 0x06
 var blockOffset = Reader.ReadUInt32();    // offset 0x08
 var blockCount = Reader.ReadUInt32();     // offset 0x0C
-// Total header: 20 bytes (0x14)
+// Fixed-offset header: 16 bytes (0x10).
+// Block table position is DYNAMIC: Reader.BaseStream.Position += blockOffset - 8
 ```
 
 ### 2.2 Block Table Entry Format
@@ -137,10 +138,11 @@ Since the header format is identical across versions, the following offsets are 
 | "Resource.FileSize" | 0x00 | 4 | File size field |
 | "Resource.HeaderVersion" | 0x04 | 2 | Header version (always 12) |
 | "Resource.Version" | 0x06 | 2 | File type version |
-| "Resource.BlockOffset" | 0x08 | 4 | Block table offset |
+| "Resource.BlockOffset" | 0x08 | 4 | Block table offset (used to locate block table at runtime) |
 | "Resource.BlockCount" | 0x0C | 4 | Number of blocks |
-| "Resource.HeaderSize" | 0x14 | - | Total header size (20 bytes) |
 | "Resource.BlockEntry.Size" | - | 12 | Size of one block entry |
+
+**Note:** Only the first 16 bytes (0x10) have fixed offsets. The block table position is NOT fixed — it is calculated at runtime via `Reader.BaseStream.Position += blockOffset - 8` using the `blockOffset` field value.
 
 ### 4.2 What CANNOT Be Filled (Version-Specific)
 
@@ -193,7 +195,7 @@ The following are **NOT available** from ValveResourceFormat because they vary b
 
 ## 8. Recommendation
 
-**For Profile files:** Fill `offsetOf()` with the version-agnostic header field offsets (0x00, 0x04, 0x06, 0x08, 0x0C). Leave `structSize()` as TODO for DATA block internals since those are resource-type-specific, not engine-version-specific.
+**For Profile files:** Fill `offsetOf()` with the version-agnostic header field offsets (0x00, 0x04, 0x06, 0x08, 0x0C). Leave `structSize()` as TODO for DATA block internals since those are resource-type-specific, not engine-version-specific. Do NOT expose a static "HeaderSize" key — only 16 bytes are fixed-offset, and the block table position is dynamic.
 
 **Important clarification:** The Profile files' current design assumes per-version offsets for "Source 2 2015" vs "Source 2 2025", but the resource header format does NOT change between these versions. The profiles should either:
 1. Use a single shared offset set for all versions (recommended), or
