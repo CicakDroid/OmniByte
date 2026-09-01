@@ -87,8 +87,11 @@ name = readStringFromHeap(buffer, stringLiteralDataOffset + stringOffset)
 ## 3. GameMakerAnalyzer
 
 ### File Format: `data.win` (GameMaker Data File)
-- **Magic**: `"YYYG"` (GM 2.3+) or `"FORM"` (GMS1 / <2.3)
-- **Structure**: Header → Chunk table → Individual chunks (GEN8, OPTN, LANG, EXTN, SOND, AAUD, SPTR, TPAG, TEXT, OBJT, ROOM, DAFL, TPAG, CODE, VARI, FUNC, STRG, TXTR, AUDO, BGND, PATH, SCPT, GLOB, FEAT, PSEM, ESCR, SEQN, TAGS, FEDS, FEAT)
+- **Magic**: `"FORM"` (all GameMaker versions — GMS1 through GM 2.3+)
+  - Verified against UndertaleModTool source, libgm spec, XentaxWiki: FORM is the ONLY magic. No YYYG variant exists.
+  - The FORM container holds named chunks (GEN8, OPTN, etc.) — same structure for all versions.
+- **Structure**: FORM header (magic + totalSize) → RIFF-like chunk sequence (each: 4-byte name + 4-byte size + data)
+- **Chunks** (same set for all versions, newer versions add more): GEN8, OPTN, LANG, EXTN, SOND, AGRP, SPRT, BGND, PATH, SCPT, GLOB, SHDR, FONT, TMLN, OBJT, ROOM, DAFL, TPAG, CODE, VARI, FUNC, STRG, TXTR, AUDO
 
 ### Key Chunks
 | Chunk | Content | Dump Value |
@@ -124,7 +127,8 @@ Per entry:
 - **metadata**: `"gmVersion"`, `"filename"`, `"objectCount"`, `"roomCount"`, `"stringCount"`
 
 ### Notes
-- GM 2.3+ uses `"YYYG"` magic; older GM uses `"FORM"` magic
+- All GameMaker versions use `"FORM"` magic (verified: UndertaleModTool, libgm, XentaxWiki)
+- FORM is a RIFF-like container: FORM + totalSize, then chunks (4-byte name + 4-byte size + data)
 - Chunk parsing: read chunk name (4 bytes) + chunk size (u32), then parse contents
 - String encoding: UTF-8 with u32 length prefix
 
