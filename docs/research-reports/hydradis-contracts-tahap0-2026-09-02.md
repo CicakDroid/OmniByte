@@ -24,6 +24,25 @@ Tahap 0 mendefinisikan 3 kontrak dasar sebelum backend ditulis di atasnya.
 
 ### Data Types
 
+#### `DisassemblerArch` enum
+```cpp
+enum class DisassemblerArch {
+    ARM,        // ARM 32-bit (ARM + Thumb mode)
+    ARM64,      // AArch64
+    x86,        // Intel x86 32-bit
+    x86_64,     // Intel x86 64-bit
+    MIPS,       // MIPS
+    PPC,        // PowerPC
+    SPARC,      // SPARC
+    SystemZ,    // IBM System/z
+    XCore,      // XCore
+    M68K,       // Motorola 68000
+    TMS320C64X, // TMS320C64x
+    M680X,      // Motorola 68000 family
+    EVM,        // Ethereum Virtual Machine
+};
+```
+
 #### `Instruction`
 ```cpp
 struct Instruction {
@@ -52,6 +71,11 @@ class IDisassembler {
 public:
     virtual ~IDisassembler() = default;
     virtual std::string name() const = 0;
+
+    // Architecture yang di-disassemble oleh instance ini.
+    // Dipilih saat construction, tidak berubah sepanjang lifetime.
+    virtual DisassemblerArch arch() const = 0;
+
     virtual DisassemblyResult disassemble(
         const uint8_t* code, size_t codeSize,
         uint64_t baseAddr, size_t count = 0
@@ -61,11 +85,18 @@ public:
 
 ### Design Decisions
 
-1. **Arch-agnostic:** `mnemonic` dan `opStr` adalah string, bukan enum Capstone-specific. Backend Capstone yang convert `CS_INS_MOV` → `"mov"`, caller tidak perlu tahu.
+1. **Instance-per-arch (Opsi A):** Satu instance IDisassembler = satu arsitektur target. Caller tentukan arch saat construct backend via factory, bukan saat panggil `disassemble()`.
 
-2. **`bytes` field disimpan:** Untuk hex dump / re-encode. Optional (bisa kosong kalau overhead terlalu besar).
+   Alasan:
+   - Caller (Detector/Analyzer) sudah tahu arch dari ELF `e_machine` header via IParser SEBELUM panggil `disassemble()`
+   - Backend Capstone butuh arch+mode saat `cs_open()`, tidak bisa diubah setelah
+   - Cleaner API: tidak perlu pass arch di setiap panggilan `disassemble()`
 
-3. **`count` parameter default 0 (unlimited):** Useful untuk truncation di large binaries.
+2. **Arch-agnostic:** `mnemonic` dan `opStr` adalah string, bukan enum Capstone-specific. Backend Capstone yang convert `CS_INS_MOV` → `"mov"`, caller tidak perlu tahu.
+
+3. **`bytes` field disimpan:** Untuk hex dump / re-encode. Optional (bisa kosong kalau overhead terlalu besar).
+
+4. **`count` parameter default 0 (unlimited):** Useful untuk truncation di large binaries.
 
 ---
 
