@@ -1,6 +1,6 @@
 # OmniByte
 
-Android project: static analysis (HydraDis) + live-device runtime + game-engine
+Android project: static & dynamic analysis (HydraDis) + live-device runtime + game-engine
 asset dumper, with a shared C++17 core wired through Gradle CMake.
 
 ## Build wiring
@@ -13,8 +13,8 @@ asset dumper, with a shared C++17 core wired through Gradle CMake.
   z3, cvc5) are placeholders with commented `find_package`/`ExternalProject_Add`
   blocks.
 - `runtime/` — live-device runtime (Bridges, ProcessManager, MemoryIO,
-  SymbolResolver/xdl). Placeholder targets.
-- `modules/Dumper/` — dumper module (DumperCore, Engines x9, Export/Writers).
+  SymbolResolver). Placeholder targets.
+- `modules/Dumper/` — dumper module (DumperCore, 7 Engines, Export/Writers).
   Placeholder targets.
 
 C++17; ABIs: `arm64-v8a`, `armeabi-v7a`. STL: `c++_shared`.
