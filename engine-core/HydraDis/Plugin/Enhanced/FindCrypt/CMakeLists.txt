@@ -7,3 +7,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(enhanced_findcrypt STATIC enhanced_findcrypt.cpp)
+target_include_directories(enhanced_findcrypt PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../..
+)

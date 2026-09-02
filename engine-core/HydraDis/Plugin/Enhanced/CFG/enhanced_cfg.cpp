@@ -1,5 +1,28 @@
-// Enhanced/CFG plugin placeholder.
-// Stage 1 scaffolding only: no analysis logic yet.
-extern "C" int enhanced_cfg_placeholder_init() {
-    return 0;
+#include "Plugin/IPlugin.h"
+#include <sstream>
+
+namespace omnibyte::hydradis::plugin {
+
+class EnhancedCfgPlugin : public IPlugin {
+public:
+    std::string name() const override { return "Enhanced/CFG"; }
+
+    bool onLoad() override { return true; }
+
+    PluginResult onRun(const PluginContext& ctx) override {
+        PluginResult result;
+        result.success = false;
+        result.errorMessage = "Enhanced/CFG: control flow graph construction not yet implemented";
+        return result;
+    }
+
+    void onUnload() override {}
+};
+
+extern "C" std::unique_ptr<IPlugin> create_enhanced_cfg_plugin() {
+    return std::make_unique<EnhancedCfgPlugin>();
 }
+
+extern "C" int enhanced_cfg_placeholder_init() { return 0; }
+
+} // namespace omnibyte::hydradis::plugin
