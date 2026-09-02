@@ -12,7 +12,6 @@ namespace omnibyte::hydradis {
 /// Backend pilihan untuk disassembly.
 enum class DisassemblerBackend {
     Capstone,   // default — selalu tersedia, ringan
-    Rizin,      // via subprocess (belum aktif)
 };
 
 /// Factory untuk IDisassembler.
@@ -30,7 +29,7 @@ public:
     /// @return unique_ptr ke IDisassembler, nullptr kalau arch/backend tidak didukung
     static std::unique_ptr<IDisassembler> create(
         DisassemblerArch arch,
-        DisassemblerBackend backend = DisassemblerBackend::Capstone
+        DisassemblerBackend backend = DisassemblerBackend::Capstone  // NOLINT — only backend
     );
 
     /// Convenience: auto-detect arch dari ELF e_machine value.

@@ -1,8 +1,6 @@
 #include "Factory/DisassemblerFactory.h"
-#include <stdexcept>
 
-// Forward declarations — each backend has a free function in its .cpp file.
-// We include them here instead of headers to avoid pulling in capstone/rizin deps.
+// Forward declaration — Capstone backend free function from disassembler_capstone.cpp
 namespace omnibyte::hydradis {
     std::unique_ptr<IDisassembler> createCapstoneDisassembler(DisassemblerArch arch);
 }
@@ -15,11 +13,6 @@ std::unique_ptr<IDisassembler> DisassemblerFactory::create(
 ) {
     switch (backend) {
         case DisassemblerBackend::Capstone:
-            return createCapstoneDisassembler(arch);
-
-        case DisassemblerBackend::Rizin:
-            // Rizin disassembler belum diimplement (subprocess-based).
-            // Fallback ke capstone untuk sekarang.
             return createCapstoneDisassembler(arch);
 
         default:

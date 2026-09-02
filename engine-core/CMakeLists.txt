@@ -16,7 +16,6 @@ add_subdirectory(HydraDis)
 #
 # target_link_libraries(engine_core PUBLIC
 #     disassembler_capstone      # -> HydraDis/Disassembler/backends/capstone-adapter
-#     disassembler_rizin         # -> HydraDis/Disassembler/backends/rizin-adapter
 #     decompiler_rizin_native    # -> HydraDis/Decompiler/backends/rizin-native
 #     decompiler_rz_ghidra       # -> HydraDis/Decompiler/backends/rz-ghidra-adapter
 #     parser_lief                # -> HydraDis/Parser/backends/lief-adapter
