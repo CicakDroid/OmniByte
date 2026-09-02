@@ -24,7 +24,7 @@ namespace omnibyte::hydradis {
 // ── Data types ─────────────────────────────────────────────────────
 
 /// Architecture target untuk disassembly.
-/// Satu instance IDisassembler = satu arch. Caller tentukan arch saat
+/// Satu instance IDisassembler = satu arch + mode. Caller tentukan arch saat
 /// construct backend via factory, bukan saat panggil disassemble().
 ///
 /// Alasan Opsi A (instance-per-arch) dipilih:
@@ -34,7 +34,14 @@ namespace omnibyte::hydradis {
 /// - Cleaner API: tidak perlu pass arch di setiap panggilan disassemble()
 /// - Ikuti pola "segitiga terbalik" -- arch knowledge di atas, spesialisasi di bawah
 enum class DisassemblerArch {
-    ARM,        // ARM 32-bit (ARM + Thumb mode)
+    ARM,        // ARM 32-bit, CS_MODE_ARM (ARM instruction set)
+    ARM_Thumb,  // ARM 32-bit, CS_MODE_THUMB (Thumb/Thumb-2 instruction set)
+                // Known limitation: satu instance = satu mode tetap. Dalam praktik
+                // nyata, .so armeabi-v7a sering punya MIX kode ARM dan Thumb
+                // (interworking) tergantung compiler flag per fungsi. Auto-detect
+                // per-fungsi (via LSB entry point / symbol flags) di luar scope
+                // Tahap ini. Gunakan ARM_Thumb untuk .so yang mayoritas Thumb-2
+                // (default NDK armeabi-v7a).
     ARM64,      // AArch64
     x86,        // Intel x86 32-bit
     x86_64,     // Intel x86 64-bit

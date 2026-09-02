@@ -15,6 +15,10 @@ public:
                 csArch = CS_ARCH_ARM;
                 csMode = CS_MODE_ARM;
                 break;
+            case DisassemblerArch::ARM_Thumb:
+                csArch = CS_ARCH_ARM;
+                csMode = CS_MODE_THUMB;
+                break;
             case DisassemblerArch::ARM64:
                 csArch = CS_ARCH_ARM64;
                 csMode = CS_MODE_ARM;
@@ -116,7 +120,7 @@ public:
             return result;
         }
 
-        csn insn = nullptr;
+        cs_insn* insn = nullptr;
         size_t decoded = cs_disasm(handle_, code, codeSize, baseAddr, count, &insn);
 
         if (decoded == 0) {
