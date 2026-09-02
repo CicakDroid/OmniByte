@@ -2,6 +2,7 @@
 #include <cvc5/cvc5.h>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace omnibyte::dumper::symbolic {
 
@@ -18,6 +19,7 @@ public:
 
     void reset() override {
         solver_.resetAssertions();
+        lastCheckWasSat_ = false;
     }
 
     void addConstraint(const std::string& smtLib2Expr) override {
@@ -34,25 +36,27 @@ public:
     SolverResult check(uint32_t timeoutMs) override {
         solver_.setTimeLimit(static_cast<uint64_t>(timeoutMs));
         cvc5::Result result = solver_.checkSat();
-        if (result.isSat()) return SolverResult::Sat;
+        if (result.isSat()) {
+            lastCheckWasSat_ = true;
+            return SolverResult::Sat;
+        }
+        lastCheckWasSat_ = false;
         if (result.isUnsat()) return SolverResult::Unsat;
         return SolverResult::Unknown;
     }
 
     std::optional<SolverModel> getModel() const override {
-        cvc5::Result result = solver_.checkSat();
-        if (!result.isSat()) {
+        if (!lastCheckWasSat_) {
             return std::nullopt;
         }
 
         SolverModel model;
-        std::vector<cvc5::Sort> sorts;
-        std::vector<cvc5::Term> consts = solver_.getValues(solver_.get Assertions());
 
-        std::string modelStr = solver_.getModel(sorts, consts);
-        model.assignments["raw"] = std::vector<uint8_t>(
-            modelStr.begin(), modelStr.end()
-        );
+        // Get all asserted formulas and iterate to find variable terms (arity 0)
+        std::vector<cvc5::Term> assertions = solver_.getAssertions();
+        for (const cvc5::Term& assertion : assertions) {
+            collectVariables(assertion, model);
+        }
 
         return model;
     }
@@ -66,8 +70,34 @@ public:
     }
 
 private:
+    void collectVariables(const cvc5::Term& term, SolverModel& model) const {
+        // A variable/constant has no children (arity 0)
+        if (term.getNumChildren() == 0) {
+            try {
+                cvc5::Term value = solver_.getValue(term);
+                std::string varName = term.getSymbol().c_str();
+                std::string valStr = value.toString();
+                model.assignments[varName] = std::vector<uint8_t>(
+                    valStr.begin(), valStr.end()
+                );
+            } catch (const cvc5::CVC5ApiException&) {
+                // Skip terms that cannot be evaluated
+            }
+            return;
+        }
+        // Recurse into children
+        for (const cvc5::Term& child : term) {
+            collectVariables(child, model);
+        }
+    }
+
     cvc5::TermManager tm_;
     mutable cvc5::Solver solver_;
+    bool lastCheckWasSat_ = false;
 };
+
+std::unique_ptr<ISolverBackend> createCVC5Solver() {
+    return std::make_unique<CVC5Solver>();
+}
 
 } // namespace omnibyte::dumper::symbolic

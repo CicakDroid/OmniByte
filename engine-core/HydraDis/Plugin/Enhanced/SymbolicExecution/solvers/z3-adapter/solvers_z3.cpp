@@ -17,6 +17,8 @@ public:
 
     void reset() override {
         solver_.reset();
+        lastCheckResult_ = z3::unknown;
+        hasChecked_ = false;
     }
 
     void addConstraint(const std::string& smtLib2Expr) override {
@@ -28,8 +30,9 @@ public:
 
     SolverResult check(uint32_t timeoutMs) override {
         solver_.set("timeout", timeoutMs);
-        z3::check_result result = solver_.check();
-        switch (result) {
+        lastCheckResult_ = solver_.check();
+        hasChecked_ = true;
+        switch (lastCheckResult_) {
             case z3::sat: return SolverResult::Sat;
             case z3::unsat: return SolverResult::Unsat;
             default: return SolverResult::Unknown;
@@ -37,7 +40,7 @@ public:
     }
 
     std::optional<SolverModel> getModel() const override {
-        if (solver_.check() != z3::sat) {
+        if (!hasChecked_ || lastCheckResult_ != z3::sat) {
             return std::nullopt;
         }
 
@@ -45,7 +48,7 @@ public:
         SolverModel result;
 
         for (unsigned i = 0; i < model.size(); ++i) {
-            z3::func_decl decl = model.get_const_decl(i);
+            z3::func_decl decl = model[i];
             z3::expr ast = model.get_const_interp(decl);
 
             std::string name = decl.name().str();
@@ -76,16 +79,12 @@ public:
 private:
     mutable z3::context ctx_;
     mutable z3::solver solver_;
+    z3::check_result lastCheckResult_ = z3::unknown;
+    bool hasChecked_ = false;
 };
 
-std::unique_ptr<ISolverBackend> SolverBackendFactory::create(Backend backend) {
-    switch (backend) {
-        case Backend::Z3:
-            return std::make_unique<Z3Solver>();
-        case Backend::CVC5:
-            throw std::runtime_error("Use CVC5Solver directly");
-    }
-    return nullptr;
+std::unique_ptr<ISolverBackend> createZ3Solver() {
+    return std::make_unique<Z3Solver>();
 }
 
 } // namespace omnibyte::dumper::symbolic

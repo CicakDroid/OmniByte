@@ -46,18 +46,35 @@ public:
             return result;
         }
 
-        RzBinFile* bf = rz_bin_file_new(core_->bin, "membuf",
-            reinterpret_cast<const char*>(code), codeSize, nullptr);
-        if (!bf) {
-            result.errorMessage = "Failed to create binary buffer";
+        // Load raw bytes into rizin via malloc:// IO provider
+        char* path = rz_str_newf("malloc://%zu", codeSize);
+        RzCoreFile* fh = rz_core_file_open(core_, path, RZ_PERM_RX, 0);
+        free(path);
+
+        if (!fh) {
+            result.errorMessage = "Failed to open memory buffer in rizin";
             return result;
         }
 
-        rz_ghidra_decompile(core_, bf, baseAddr);
+        // Write the actual code bytes into the malloc'd IO region
+        rz_io_write_at(core_->io, baseAddr, code, codeSize);
+        rz_core_block_read(core_);
 
-        result.success = true;
-        result.address = baseAddr;
-        result.pseudocode = "rz-ghidra decompilation result";
+        // Seek to the target address for decompilation
+        rz_core_seek(core_, baseAddr, true);
+
+        // Use rz_core_cmd_str to get decompiled C pseudocode via "pdg" command
+        // pdg = decompile current function with Ghidra decompiler
+        char* decompOutput = rz_core_cmd_str(core_, "pdg");
+        if (decompOutput) {
+            result.success = true;
+            result.address = baseAddr;
+            result.pseudocode = std::string(decompOutput);
+            free(decompOutput);
+        } else {
+            result.errorMessage = "rz_ghidra decompilation returned no output";
+        }
+
         return result;
     }
 

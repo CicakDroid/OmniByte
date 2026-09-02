@@ -1,7 +1,16 @@
 #include "Decompiler/IDecompiler.h"
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <memory>
 #include <stdexcept>
+
+// Forward declare rizin types to avoid pulling in all of rizin's headers
+// when only the C API is needed via popen.
+struct RzCore;
 
 namespace omnibyte::hydradis {
 
@@ -30,12 +39,35 @@ public:
             return result;
         }
 
-        std::string cmd = rizinPath_ + " -q -e scr.color=0 -c \"pd " +
-                          std::to_string(codeSize / 4) + " @ " +
-                          std::to_string(baseAddr) + "\" 2>/dev/null";
+        // Write raw bytes to a temp file so rizin can load them
+        // Using malloc:// via rizin's stdin pipe would be cleaner but
+        // requires rizin C API access. Temp file is reliable fallback.
+        char tmpPath[] = "/tmp/rizin_XXXXXX";
+        int tmpFd = mkstemp(tmpPath);
+        if (tmpFd < 0) {
+            result.errorMessage = "Failed to create temp file";
+            return result;
+        }
+
+        ssize_t written = write(tmpFd, code, codeSize);
+        close(tmpFd);
+
+        if (written != static_cast<ssize_t>(codeSize)) {
+            unlink(tmpPath);
+            result.errorMessage = "Failed to write code to temp file";
+            return result;
+        }
+
+        // Build rizin command: open file, seek to baseAddr, disassemble codeSize/4 instructions
+        // "-q" = quiet, "-e scr.color=0" = no color codes in output
+        std::string cmd = rizinPath_ +
+            " -q -e scr.color=0 -c \"s " + std::to_string(baseAddr) +
+            " ; pd " + std::to_string(codeSize / 4) +
+            "\" " + std::string(tmpPath) + " 2>/dev/null";
 
         FILE* pipe = popen(cmd.c_str(), "r");
         if (!pipe) {
+            unlink(tmpPath);
             result.errorMessage = "Failed to execute rizin";
             return result;
         }
@@ -47,6 +79,8 @@ public:
         }
 
         int status = pclose(pipe);
+        unlink(tmpPath);
+
         if (status != 0) {
             result.errorMessage = "rizin exited with status " + std::to_string(status);
             return result;
