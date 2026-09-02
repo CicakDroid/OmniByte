@@ -6,6 +6,7 @@ namespace omnibyte::hydradis::plugin {
 class EnhancedAstPlugin : public IPlugin {
 public:
     std::string name() const override { return "Enhanced/AST"; }
+    std::string version() const override { return "0.1.0-dev"; }
 
     bool onLoad() override { return true; }
 

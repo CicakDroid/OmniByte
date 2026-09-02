@@ -10,6 +10,7 @@ namespace omnibyte::hydradis::plugin {
 class DeobfuscatePlugin : public IPlugin {
 public:
     std::string name() const override { return "Deobfuscate"; }
+    std::string version() const override { return "1.0.0"; }
 
     bool onLoad() override { return true; }
 

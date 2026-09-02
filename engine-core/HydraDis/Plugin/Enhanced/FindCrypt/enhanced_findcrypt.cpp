@@ -8,6 +8,7 @@ namespace omnibyte::hydradis::plugin {
 class EnhancedFindCryptPlugin : public IPlugin {
 public:
     std::string name() const override { return "Enhanced/FindCrypt"; }
+    std::string version() const override { return "1.0.0"; }
 
     bool onLoad() override { return true; }
 

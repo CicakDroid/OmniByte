@@ -9,7 +9,7 @@
 //     akses langsung ke instance backend.
 //   - Context menyediakan akses ke SEMUA hasil analisis (multi-section,
 //     multi-function), bukan hanya satu — konsisten dengan AnalysisResult
-//     yang menyimpan vector<DisasmSection> dan vector<DecompyleResult>.
+//     yang menyimpan vector<DisassemblyResult> dan vector<DecompiledFunction>.
 //   - sourceLabel: opsional, boleh kosong. Untuk logging/laporan
 //     (mis. FindCrypt sebut nama file di hasil temuan). Tidak dipakai
 //     sebagai dependency — analisis inti jalan dari buffer/bytes,
