@@ -133,6 +133,11 @@ private:
     bool checkShacal2(const uint8_t* data, size_t size, size_t offset) const;
     bool checkWake(const uint8_t* data, size_t size, size_t offset) const;
     bool checkModm(const uint8_t* data, size_t size, size_t offset) const;
+
+    bool checkHight(const uint8_t* data, size_t size, size_t offset) const;
+    bool checkSafer(const uint8_t* data, size_t size, size_t offset) const;
+    bool checkCast256(const uint8_t* data, size_t size, size_t offset) const;
+    bool checkBlake2b(const uint8_t* data, size_t size, size_t offset) const;
 };
 
 }  // namespace omnibyte::deob
