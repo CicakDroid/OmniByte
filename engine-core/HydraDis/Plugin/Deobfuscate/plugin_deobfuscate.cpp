@@ -56,31 +56,6 @@ public:
         if (ctx.disassembly) {
             const auto& instrs = ctx.disassembly->instructions;
             for (const auto& instr : instrs) {
-                if (instr.mnemonic == "eor" || instr.mnemonic == "xor") {
-                    if (!first) output << ",";
-                    first = false;
-                    output << "{\"type\":\"xor_obfuscation\","
-                           << "\"address\":\"0x" << std::hex << instr.address << "\","
-                           << "\"instruction\":\"" << escapeJson(instr.mnemonic + " " + instr.opStr) << "\","
-                           << "\"confidence\":0.8}";
-                }
-
-                if (instr.mnemonic == "ldrb" || instr.mnemonic == "ldrh" || instr.mnemonic == "ldr") {
-                    auto next = std::find_if(instrs.begin(), instrs.end(),
-                        [&](const auto& i) { return i.address > instr.address; });
-                    if (next != instrs.end()) {
-                        if (next->mnemonic == "eor" || next->mnemonic == "xor") {
-                            if (!first) output << ",";
-                            first = false;
-                            output << "{\"type\":\"string_decryption\","
-                                   << "\"address\":\"0x" << std::hex << instr.address << "\","
-                                   << "\"loadInstruction\":\"" << escapeJson(instr.mnemonic + " " + instr.opStr) << "\","
-                                   << "\"xorInstruction\":\"" << escapeJson(next->mnemonic + " " + next->opStr) << "\","
-                                   << "\"confidence\":0.9}";
-                        }
-                    }
-                }
-
                 std::string fullInstr = instr.mnemonic + " " + instr.opStr;
                 for (const auto& sub : OPCODE_SUBSTITUTIONS) {
                     if (fullInstr == sub.obfuscated && sub.obfuscated != sub.canonical) {

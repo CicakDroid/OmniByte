@@ -577,6 +577,38 @@ static const uint8_t RAWDES_SPBOX_PREFIX[64] = {
 std::vector<CryptoHit> FindCrypt3Engine::scanRegion(const uint8_t* data, size_t size) const {
     std::vector<CryptoHit> hits;
 
+    for (size_t i = 0; i + 4 <= size; i += 4) {
+        if (checkXxtea(data, size, i)) {
+            uint32_t val = *reinterpret_cast<const uint32_t*>(data + i);
+            double conf = (val == XXTEA_DELTA) ? 0.85 : 0.70;
+            hits.push_back({static_cast<uintptr_t>(i), "XXTEA", conf, "TEA/XXTEA DELTA constant"});
+        }
+    }
+
+    for (size_t i = 0; i + 7 <= size; ++i) {
+        if (checkRc4Ksa(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "RC4", 0.75, "RC4 KSA loop bound (cmp reg, 0x100)"});
+        }
+    }
+
+    for (size_t i = 0; i + 16 <= size; ++i) {
+        if (checkRc2(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "RC2", 0.80, "RC2 S-box"});
+        }
+    }
+
+    for (size_t i = 0; i + 16 <= size; ++i) {
+        if (checkGost(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "GOST", 0.80, "GOST S-box"});
+        }
+    }
+
+    for (size_t i = 0; i + 40 <= size; ++i) {
+        if (checkWake(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "WAKE", 0.80, "WAKE T-table"});
+        }
+    }
+
     for (size_t i = 0; i + 256 <= size; ++i) {
         if (checkAesSbox(data, size, i)) {
             hits.push_back({static_cast<uintptr_t>(i), "AES", 0.95, "AES S-box (256 bytes)"});
@@ -589,9 +621,9 @@ std::vector<CryptoHit> FindCrypt3Engine::scanRegion(const uint8_t* data, size_t 
         }
     }
 
-    for (size_t i = 0; i + 32 <= size; ++i) {
-        if (checkSha256(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "SHA-256", 0.90, "SHA-256 H0 constants"});
+    for (size_t i = 0; i + 64 <= size; ++i) {
+        if (checkRawDesSpbox(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "RawDES-Spbox", 0.80, "RawDES S/p-boxes"});
         }
     }
 
@@ -601,282 +633,207 @@ std::vector<CryptoHit> FindCrypt3Engine::scanRegion(const uint8_t* data, size_t 
         }
     }
 
-    // XXTEA/TEA DELTA constant (4 bytes, scan every 4-byte alignment)
-    for (size_t i = 0; i + 4 <= size; i += 4) {
-        if (checkXxtea(data, size, i)) {
-            uint32_t val = *reinterpret_cast<const uint32_t*>(data + i);
-            double conf = (val == XXTEA_DELTA) ? 0.85 : 0.70;
-            hits.push_back({static_cast<uintptr_t>(i), "XXTEA", conf, "TEA/XXTEA DELTA constant"});
-        }
-    }
-
-    // RC4 KSA patterns (instruction byte sequences)
-    for (size_t i = 0; i + 7 <= size; ++i) {
-        if (checkRc4Ksa(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "RC4", 0.75, "RC4 KSA loop bound (cmp reg, 0x100)"});
-        }
-    }
-
-    // Whirlpool S-box (32 bytes)
-    for (size_t i = 0; i + 32 <= size; ++i) {
-        if (checkWhirlpool(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "Whirlpool", 0.85, "Whirlpool S-box"});
-        }
-    }
-
-    // RIPEMD-160 H0 (20 bytes)
-    for (size_t i = 0; i + 20 <= size; ++i) {
-        if (checkRipemd160(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "RIPEMD-160", 0.90, "RIPEMD-160 H0 initial values"});
-        }
-    }
-
-    // Camellia S-box (32 bytes)
     for (size_t i = 0; i + 32 <= size; ++i) {
         if (checkCamellia(data, size, i)) {
             hits.push_back({static_cast<uintptr_t>(i), "Camellia", 0.85, "Camellia S-box"});
         }
     }
 
-    // Serpent S-box (32 bytes)
     for (size_t i = 0; i + 32 <= size; ++i) {
         if (checkSerpent(data, size, i)) {
             hits.push_back({static_cast<uintptr_t>(i), "Serpent", 0.80, "Serpent S-box"});
         }
     }
 
-    // Twofish P-box (32 bytes)
-    for (size_t i = 0; i + 32 <= size; ++i) {
-        if (checkTwofish(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "Twofish", 0.80, "Twofish P-box"});
-        }
-    }
-
-    // GOST S-box (16 bytes)
-    for (size_t i = 0; i + 16 <= size; ++i) {
-        if (checkGost(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "GOST", 0.80, "GOST S-box"});
-        }
-    }
-
-    // RC2 S-box (16 bytes)
-    for (size_t i = 0; i + 16 <= size; ++i) {
-        if (checkRc2(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "RC2", 0.80, "RC2 S-box"});
-        }
-    }
-
-    // ChaCha/Salsa20 constants (16 bytes)
-    for (size_t i = 0; i + 16 <= size; ++i) {
-        if (checkChacha(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "ChaCha/Salsa20", 0.90, "ChaCha/Salsa20 constants"});
-        }
-    }
-
-    // SHA-1 H0 (20 bytes)
-    for (size_t i = 0; i + 20 <= size; ++i) {
-        if (checkSha1(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "SHA-1", 0.90, "SHA-1 H0 initial hash values"});
-        }
-    }
-
-    // SHA-384 H0 (48 bytes)
-    for (size_t i = 0; i + 48 <= size; ++i) {
-        if (checkSha384(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "SHA-384", 0.90, "SHA-384 H0 initial hash values"});
-        }
-    }
-
-    // SHA-512 H0 (64 bytes)
-    for (size_t i = 0; i + 64 <= size; ++i) {
-        if (checkSha512(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "SHA-512", 0.90, "SHA-512 H0 initial hash values"});
-        }
-    }
-
-    // MD2 PI_SUBST (256 bytes)
-    for (size_t i = 0; i + 256 <= size; ++i) {
-        if (checkMd2(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "MD2", 0.95, "MD2 PI_SUBST S-box"});
-        }
-    }
-
-    // MD4 T[1..16] (64 bytes)
-    for (size_t i = 0; i + 64 <= size; ++i) {
-        if (checkMd4(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "MD4", 0.85, "MD4 T constants"});
-        }
-    }
-
-    // SEED KC (64 bytes)
-    for (size_t i = 0; i + 64 <= size; ++i) {
-        if (checkSeed(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "SEED", 0.90, "SEED KC constants"});
-        }
-    }
-
-    // LEA Delta (32 bytes)
-    for (size_t i = 0; i + 32 <= size; ++i) {
-        if (checkLea(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "LEA", 0.90, "LEA Delta constant"});
-        }
-    }
-
-    // Serpent full S-box (128 bytes)
     for (size_t i = 0; i + 128 <= size; ++i) {
         if (checkSerpentFull(data, size, i)) {
             hits.push_back({static_cast<uintptr_t>(i), "Serpent", 0.90, "Serpent full S-box"});
         }
     }
 
-    // Tiger IV (24 bytes)
-    for (size_t i = 0; i + 24 <= size; ++i) {
-        if (checkTiger(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "Tiger", 0.90, "Tiger IV"});
-        }
-    }
-
-    // HAVAL IV (32 bytes)
     for (size_t i = 0; i + 32 <= size; ++i) {
-        if (checkHaval(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "HAVAL", 0.85, "HAVAL IV"});
+        if (checkTwofish(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "Twofish", 0.80, "Twofish P-box"});
         }
     }
 
-    // BLAKE2s IV (32 bytes)
+    for (size_t i = 0; i + 64 <= size; ++i) {
+        if (checkSeed(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "SEED", 0.90, "SEED KC constants"});
+        }
+    }
+
     for (size_t i = 0; i + 32 <= size; ++i) {
-        if (checkBlake2s(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "BLAKE2s", 0.85, "BLAKE2s IV"});
+        if (checkLea(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "LEA", 0.90, "LEA Delta constant"});
         }
     }
 
-    // Keccak round constants (192 bytes)
-    for (size_t i = 0; i + 192 <= size; ++i) {
-        if (checkKeccak(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "Keccak/SHA-3", 0.95, "Keccak round constants"});
-        }
-    }
-
-    // SIMON-64/128 z3 (8 bytes)
-    for (size_t i = 0; i + 8 <= size; ++i) {
-        if (checkSimon(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "SIMON", 0.85, "SIMON-64/128 z3 constant"});
-        }
-    }
-
-    // Skipjack F-table (256 bytes)
-    for (size_t i = 0; i + 256 <= size; ++i) {
-        if (checkSkipjack(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "Skipjack", 0.95, "Skipjack F-table"});
-        }
-    }
-
-    // Square S-box prefix (32 bytes)
-    for (size_t i = 0; i + 32 <= size; ++i) {
-        if (checkSquare(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "Square", 0.80, "Square S-box"});
-        }
-    }
-
-    // SHARK S-box prefix (32 bytes)
-    for (size_t i = 0; i + 32 <= size; ++i) {
-        if (checkShark(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "SHARK", 0.80, "SHARK S-box"});
-        }
-    }
-
-    // Curve25519 field prime (32 bytes)
-    for (size_t i = 0; i + 32 <= size; ++i) {
-        if (checkDonna(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "Curve25519", 0.85, "Curve25519 field prime"});
-        }
-    }
-
-    // === P11: Tier 1 Algorithms ===
-
-    // MD5MAC T constants (48 bytes)
-    for (size_t i = 0; i + 48 <= size; ++i) {
-        if (checkMd5mac(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "MD5MAC", 0.90, "MD5MAC T constants"});
-        }
-    }
-
-    // SHACAL2 K constants (256 bytes)
-    for (size_t i = 0; i + 256 <= size; ++i) {
-        if (checkShacal2(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "SHACAL2", 0.95, "SHACAL2 K constants"});
-        }
-    }
-
-    // WAKE T-table (40 bytes)
-    for (size_t i = 0; i + 40 <= size; ++i) {
-        if (checkWake(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "WAKE", 0.80, "WAKE T-table"});
-        }
-    }
-
-    // modm constants (40 bytes)
-    for (size_t i = 0; i + 40 <= size; ++i) {
-        if (checkModm(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "Curve25519", 0.85, "modm modular multiplication"});
-        }
-    }
-
-    // === P12: Tier 2 Algorithms ===
-
-    // HIGHT Delta (128 bytes)
     for (size_t i = 0; i + 128 <= size; ++i) {
         if (checkHight(data, size, i)) {
             hits.push_back({static_cast<uintptr_t>(i), "HIGHT", 0.90, "HIGHT Delta constants"});
         }
     }
 
-    // SAFER EXP table prefix (32 bytes)
     for (size_t i = 0; i + 32 <= size; ++i) {
         if (checkSafer(data, size, i)) {
             hits.push_back({static_cast<uintptr_t>(i), "SAFER", 0.80, "SAFER EXP table"});
         }
     }
 
-    // CAST-256 sigma prefix (32 bytes)
-    for (size_t i = 0; i + 32 <= size; ++i) {
-        if (checkCast256(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "CAST-256", 0.85, "CAST-256 sigma table"});
-        }
-    }
-
-    // BLAKE2b SIGMA table (192 bytes)
-    for (size_t i = 0; i + 192 <= size; ++i) {
-        if (checkBlake2b(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "BLAKE2b", 0.95, "BLAKE2b SIGMA permutation"});
-        }
-    }
-
-    // CAST-128 S-box prefix (64 bytes of 8192)
     for (size_t i = 0; i + 64 <= size; ++i) {
         if (checkCast128(data, size, i)) {
             hits.push_back({static_cast<uintptr_t>(i), "CAST-128", 0.85, "CAST-128 S-box"});
         }
     }
 
-    // MARS S-box prefix (64 bytes of 2048)
+    for (size_t i = 0; i + 32 <= size; ++i) {
+        if (checkCast256(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "CAST-256", 0.85, "CAST-256 sigma table"});
+        }
+    }
+
     for (size_t i = 0; i + 64 <= size; ++i) {
         if (checkMars(data, size, i)) {
             hits.push_back({static_cast<uintptr_t>(i), "MARS", 0.85, "IBM MARS S-box"});
         }
     }
 
-    // Rijndael Te0 prefix (64 bytes of 1024) — AES extended key-schedule tables
     for (size_t i = 0; i + 64 <= size; ++i) {
         if (checkRijndaelTe(data, size, i)) {
             hits.push_back({static_cast<uintptr_t>(i), "Rijndael-Te", 0.90, "Rijndael Te0 table"});
         }
     }
 
-    // RawDES Spbox prefix (64 bytes of 2048)
+    for (size_t i = 0; i + 256 <= size; ++i) {
+        if (checkSkipjack(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "Skipjack", 0.95, "Skipjack F-table"});
+        }
+    }
+
+    for (size_t i = 0; i + 32 <= size; ++i) {
+        if (checkSquare(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "Square", 0.80, "Square S-box"});
+        }
+    }
+
+    for (size_t i = 0; i + 32 <= size; ++i) {
+        if (checkShark(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "SHARK", 0.80, "SHARK S-box"});
+        }
+    }
+
+    for (size_t i = 0; i + 8 <= size; ++i) {
+        if (checkSimon(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "SIMON", 0.85, "SIMON-64/128 z3 constant"});
+        }
+    }
+
+    for (size_t i = 0; i + 256 <= size; ++i) {
+        if (checkShacal2(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "SHACAL2", 0.95, "SHACAL2 K constants"});
+        }
+    }
+
+    for (size_t i = 0; i + 20 <= size; ++i) {
+        if (checkSha1(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "SHA-1", 0.90, "SHA-1 H0 initial hash values"});
+        }
+    }
+
+    for (size_t i = 0; i + 32 <= size; ++i) {
+        if (checkSha256(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "SHA-256", 0.90, "SHA-256 H0 constants"});
+        }
+    }
+
+    for (size_t i = 0; i + 48 <= size; ++i) {
+        if (checkSha384(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "SHA-384", 0.90, "SHA-384 H0 initial hash values"});
+        }
+    }
+
     for (size_t i = 0; i + 64 <= size; ++i) {
-        if (checkRawDesSpbox(data, size, i)) {
-            hits.push_back({static_cast<uintptr_t>(i), "RawDES-Spbox", 0.80, "RawDES S/p-boxes"});
+        if (checkSha512(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "SHA-512", 0.90, "SHA-512 H0 initial hash values"});
+        }
+    }
+
+    for (size_t i = 0; i + 192 <= size; ++i) {
+        if (checkKeccak(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "Keccak/SHA-3", 0.95, "Keccak round constants"});
+        }
+    }
+
+    for (size_t i = 0; i + 256 <= size; ++i) {
+        if (checkMd2(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "MD2", 0.95, "MD2 PI_SUBST S-box"});
+        }
+    }
+
+    for (size_t i = 0; i + 64 <= size; ++i) {
+        if (checkMd4(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "MD4", 0.85, "MD4 T constants"});
+        }
+    }
+
+    for (size_t i = 0; i + 48 <= size; ++i) {
+        if (checkMd5mac(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "MD5MAC", 0.90, "MD5MAC T constants"});
+        }
+    }
+
+    for (size_t i = 0; i + 20 <= size; ++i) {
+        if (checkRipemd160(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "RIPEMD-160", 0.90, "RIPEMD-160 H0 initial values"});
+        }
+    }
+
+    for (size_t i = 0; i + 32 <= size; ++i) {
+        if (checkWhirlpool(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "Whirlpool", 0.85, "Whirlpool S-box"});
+        }
+    }
+
+    for (size_t i = 0; i + 24 <= size; ++i) {
+        if (checkTiger(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "Tiger", 0.90, "Tiger IV"});
+        }
+    }
+
+    for (size_t i = 0; i + 32 <= size; ++i) {
+        if (checkHaval(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "HAVAL", 0.85, "HAVAL IV"});
+        }
+    }
+
+    for (size_t i = 0; i + 32 <= size; ++i) {
+        if (checkBlake2s(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "BLAKE2s", 0.85, "BLAKE2s IV"});
+        }
+    }
+
+    for (size_t i = 0; i + 192 <= size; ++i) {
+        if (checkBlake2b(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "BLAKE2b", 0.95, "BLAKE2b SIGMA permutation"});
+        }
+    }
+
+    for (size_t i = 0; i + 16 <= size; ++i) {
+        if (checkChacha(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "ChaCha/Salsa20", 0.90, "ChaCha/Salsa20 constants"});
+        }
+    }
+
+    for (size_t i = 0; i + 32 <= size; ++i) {
+        if (checkDonna(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "Curve25519", 0.85, "Curve25519 field prime"});
+        }
+    }
+
+    for (size_t i = 0; i + 40 <= size; ++i) {
+        if (checkModm(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "Curve25519", 0.85, "modm modular multiplication"});
         }
     }
 
@@ -1143,6 +1100,35 @@ bool FindCrypt3Engine::checkRijndaelTe(const uint8_t* data, size_t size, size_t 
 bool FindCrypt3Engine::checkRawDesSpbox(const uint8_t* data, size_t size, size_t offset) const {
     if (offset + 64 > size) return false;
     return memcmp(data + offset, RAWDES_SPBOX_PREFIX, 64) == 0;
+}
+
+std::vector<CryptoHit> FindCrypt3Engine::scanInstructions(
+    const std::vector<SimpleInstruction>& instrs) const {
+    std::vector<CryptoHit> hits;
+
+    for (size_t i = 0; i < instrs.size(); ++i) {
+        const auto& instr = instrs[i];
+
+        if (instr.mnemonic == "eor" || instr.mnemonic == "xor") {
+            hits.push_back({instr.address, "XOR", 0.8,
+                "XOR obfuscation (eor/xor instruction)"});
+        }
+
+        if (instr.mnemonic == "ldrb" || instr.mnemonic == "ldrh" ||
+            instr.mnemonic == "ldr") {
+            for (size_t j = i + 1; j < instrs.size(); ++j) {
+                if (instrs[j].address <= instr.address) continue;
+                if (instrs[j].mnemonic == "eor" ||
+                    instrs[j].mnemonic == "xor") {
+                    hits.push_back({instr.address, "StringDec", 0.9,
+                        "String decryption (ldr + eor pattern)"});
+                }
+                break;
+            }
+        }
+    }
+
+    return hits;
 }
 
 }  // namespace omnibyte::deob

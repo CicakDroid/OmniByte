@@ -1,5 +1,5 @@
 #pragma once
-// FindCrypt3 — Crypto constant finder.
+// FindCrypt3 — Crypto constant & pattern finder.
 // Source: https://github.com/HongThatCong/FindCrypt3 (MIT)
 
 #include <cstdint>
@@ -16,7 +16,13 @@ struct CryptoHit {
     std::string description;
 };
 
-/// Crypto constant finder engine.
+struct SimpleInstruction {
+    uint64_t address;
+    std::string mnemonic;
+    std::string opStr;
+};
+
+/// Crypto constant & pattern finder engine.
 /// Scans binary regions for known crypto algorithm signatures.
 class FindCrypt3Engine {
 public:
@@ -31,6 +37,9 @@ public:
 
     /// Get list of supported algorithms.
     std::vector<std::string> getSupportedAlgorithms() const;
+
+    /// Scan instruction stream for crypto patterns (XOR, string decryption).
+    std::vector<CryptoHit> scanInstructions(const std::vector<SimpleInstruction>& instrs) const;
 
 private:
     /// Check for AES S-box at offset.

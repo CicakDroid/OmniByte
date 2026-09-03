@@ -1,4 +1,4 @@
-# Enhanced/FindCrypt plugin — placeholder.
+# Enhanced/Crypt plugin — crypto constant & pattern scanner.
 cmake_minimum_required(VERSION 3.22.1)
 
 project(enhanced_findcrypt LANGUAGES CXX)
