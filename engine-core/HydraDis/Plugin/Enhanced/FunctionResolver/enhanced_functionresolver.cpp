@@ -10,10 +10,12 @@ struct FunctionInfo {
     uint64_t startAddr = 0;
     uint64_t endAddr = 0;
     std::string name;
+    std::string demangledName;
     std::set<uint64_t> callers;
     std::set<uint64_t> callees;
     bool isExport = false;
     bool isImport = false;
+    bool isPltStub = false;
 };
 
 class EnhancedFunctionResolverPlugin : public IPlugin {
@@ -44,7 +46,6 @@ public:
             for (const auto& sym : *ctx.symbols()) {
                 if (sym.value == 0) continue;
 
-                // sym.type == 2 is STT_FUNC (function symbol)
                 bool isFunc = (sym.type == 2) ||
                               (sym.name.find("sub_") != std::string::npos) ||
                               (sym.name.find("_Z") == 0);
@@ -52,16 +53,39 @@ public:
                 if (isFunc) {
                     auto& fn = functions[sym.value];
                     fn.startAddr = sym.value;
-                    fn.name = sym.name;
+                    if (fn.name.empty() || fn.name.find("sub_") == 0 || fn.name.find("plt_") == 0) {
+                        fn.name = sym.name;
+                    }
                     fn.isExport = true;
                     if (sym.size > 0) {
                         fn.endAddr = sym.value + sym.size - 1;
+                    }
+                    if (sym.name.find("_Z") == 0) {
+                        fn.demangledName = demangleItanium(sym.name);
                     }
                 }
             }
         }
 
         for (const auto& [addr, instr] : instrMap) {
+            bool isPltStub = false;
+            if (instr->mnemonic == "ldr" &&
+                instr->opStr.find("x16") != std::string::npos) {
+                auto next = instrMap.find(addr + 4);
+                if (next != instrMap.end() && next->second->mnemonic == "br" &&
+                    next->second->opStr.find("x16") != std::string::npos) {
+                    isPltStub = true;
+                }
+            }
+
+            if (isPltStub) {
+                auto& fn = functions[addr];
+                fn.startAddr = addr;
+                fn.name = "plt_" + toHex(addr);
+                fn.isPltStub = true;
+                fn.isImport = true;
+            }
+
             if (instr->mnemonic == "stp" &&
                 instr->opStr.find("x29") != std::string::npos &&
                 instr->opStr.find("x30") != std::string::npos) {
@@ -142,7 +166,11 @@ public:
             }
             json << "],";
             json << "\"isExport\":" << (fn.isExport ? "true" : "false") << ",";
-            json << "\"isImport\":" << (fn.isImport ? "true" : "false");
+            json << "\"isImport\":" << (fn.isImport ? "true" : "false") << ",";
+            json << "\"isPltStub\":" << (fn.isPltStub ? "true" : "false");
+            if (!fn.demangledName.empty()) {
+                json << ",\"demangledName\":\"" << escapeJson(fn.demangledName) << "\"";
+            }
             json << "}";
         }
         json << "],";
@@ -195,6 +223,55 @@ private:
             }
         }
         return result;
+    }
+
+    static std::string demangleItanium(const std::string& mangled) {
+        if (mangled.empty() || mangled[0] != '_') return mangled;
+
+        std::string result;
+        size_t i = 0;
+
+        if (mangled.size() > 2 && mangled[0] == '_' && mangled[1] == 'Z') {
+            i = 2;
+        } else {
+            return mangled;
+        }
+
+        if (i < mangled.size() && mangled[i] == 'N') {
+            i++;
+            while (i < mangled.size() && mangled[i] != 'E') {
+                if (std::isdigit(mangled[i])) {
+                    size_t len = 0;
+                    while (i < mangled.size() && std::isdigit(mangled[i])) {
+                        len = len * 10 + (mangled[i] - '0');
+                        i++;
+                    }
+                    if (i + len <= mangled.size()) {
+                        if (!result.empty()) result += "::";
+                        result += mangled.substr(i, len);
+                        i += len;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            if (i < mangled.size() && mangled[i] == 'E') {
+                i++;
+            }
+        } else if (i < mangled.size() && std::isdigit(mangled[i])) {
+            size_t len = 0;
+            while (i < mangled.size() && std::isdigit(mangled[i])) {
+                len = len * 10 + (mangled[i] - '0');
+                i++;
+            }
+            if (i + len <= mangled.size()) {
+                result = mangled.substr(i, len);
+            }
+        }
+
+        return result.empty() ? mangled : result;
     }
 };
 
