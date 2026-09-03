@@ -128,6 +128,11 @@ private:
 
     /// Check for Curve25519 field prime at offset.
     bool checkDonna(const uint8_t* data, size_t size, size_t offset) const;
+
+    bool checkMd5mac(const uint8_t* data, size_t size, size_t offset) const;
+    bool checkShacal2(const uint8_t* data, size_t size, size_t offset) const;
+    bool checkWake(const uint8_t* data, size_t size, size_t offset) const;
+    bool checkModm(const uint8_t* data, size_t size, size_t offset) const;
 };
 
 }  // namespace omnibyte::deob
