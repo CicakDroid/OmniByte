@@ -138,6 +138,11 @@ private:
     bool checkSafer(const uint8_t* data, size_t size, size_t offset) const;
     bool checkCast256(const uint8_t* data, size_t size, size_t offset) const;
     bool checkBlake2b(const uint8_t* data, size_t size, size_t offset) const;
+
+    bool checkCast128(const uint8_t* data, size_t size, size_t offset) const;
+    bool checkMars(const uint8_t* data, size_t size, size_t offset) const;
+    bool checkRijndaelTe(const uint8_t* data, size_t size, size_t offset) const;
+    bool checkRawDesSpbox(const uint8_t* data, size_t size, size_t offset) const;
 };
 
 }  // namespace omnibyte::deob
