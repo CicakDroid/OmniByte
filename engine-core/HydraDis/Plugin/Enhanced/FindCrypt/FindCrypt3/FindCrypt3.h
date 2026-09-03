@@ -77,6 +77,57 @@ private:
 
     /// Check for ChaCha/Salsa20 constants at offset.
     bool checkChacha(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for SHA-1 H0 at offset.
+    bool checkSha1(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for SHA-384 H0 at offset.
+    bool checkSha384(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for SHA-512 H0 at offset.
+    bool checkSha512(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for MD2 PI_SUBST at offset.
+    bool checkMd2(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for MD4 T constants at offset.
+    bool checkMd4(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for SEED KC constants at offset.
+    bool checkSeed(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for LEA Delta constant at offset.
+    bool checkLea(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for Serpent full S-box at offset.
+    bool checkSerpentFull(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for Tiger IV at offset.
+    bool checkTiger(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for HAVAL IV at offset.
+    bool checkHaval(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for BLAKE2s IV at offset.
+    bool checkBlake2s(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for Keccak round constants at offset.
+    bool checkKeccak(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for SIMON-64/128 z3 constant at offset.
+    bool checkSimon(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for Skipjack F-table at offset.
+    bool checkSkipjack(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for Square S-box at offset.
+    bool checkSquare(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for SHARK S-box at offset.
+    bool checkShark(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for Curve25519 field prime at offset.
+    bool checkDonna(const uint8_t* data, size_t size, size_t offset) const;
 };
 
 }  // namespace omnibyte::deob
