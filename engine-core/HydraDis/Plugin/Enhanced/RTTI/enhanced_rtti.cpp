@@ -12,6 +12,7 @@ struct TypeInfo {
     uint64_t vtableAddr = 0;
     std::vector<uint64_t> vtableEntries;
     std::vector<std::string> baseClasses;
+    size_t vtableSize = 0;
 };
 
 class EnhancedRttiPlugin : public IPlugin {
@@ -72,11 +73,22 @@ public:
 
         if (types.empty() && ctx.binary->sections.size() > 0) {
             for (const auto& sec : ctx.binary->sections) {
-                if (sec.name == ".rodata" || sec.name == ".data.rel.ro") {
+                if (sec.name == ".rodata" || sec.name == ".data.rel.ro" ||
+                    sec.name == ".data.rel.ro.local") {
                     scanSectionForRtti(sec, types, vtableToClass);
                 }
             }
         }
+
+        std::vector<TypeInfo> deduped;
+        std::set<std::string> seen;
+        for (const auto& t : types) {
+            if (seen.find(t.mangledName) == seen.end()) {
+                seen.insert(t.mangledName);
+                deduped.push_back(t);
+            }
+        }
+        types = deduped;
 
         std::ostringstream json;
         json << "{";
@@ -96,7 +108,8 @@ public:
                 firstBase = false;
                 json << "\"" << escapeJson(b) << "\"";
             }
-            json << "]";
+            json << "],";
+            json << "\"vtableSize\":" << t.vtableSize;
             json << "}";
         }
         json << "],";
@@ -174,13 +187,22 @@ private:
             std::memcpy(&vtablePtr, &sec.virtualAddress + offset, 8);
 
             if (vtablePtr > 0x1000 && vtablePtr < 0xFFFFFFFFFFFFULL) {
+                size_t entryCount = 0;
+                for (uint64_t scan = offset + 8; scan + 8 <= sec.size; scan += 8) {
+                    uint64_t nextPtr = 0;
+                    std::memcpy(&nextPtr, &sec.virtualAddress + scan, 8);
+                    if (nextPtr == 0 || nextPtr > 0xFFFFFFFFFFFFULL) break;
+                    entryCount++;
+                }
+
                 std::string potentialName = "type_info_at_0x" + toHex(sec.virtualAddress + offset);
                 types.push_back({
                     potentialName,
                     potentialName,
                     vtablePtr,
                     {},
-                    {}
+                    {},
+                    entryCount
                 });
             }
         }
