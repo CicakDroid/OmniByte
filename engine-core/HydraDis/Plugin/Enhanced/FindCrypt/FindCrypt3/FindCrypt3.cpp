@@ -56,6 +56,76 @@ static const uint32_t MD5_T[64] = {
     0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
 };
 
+// XXTEA/TEA magic constant (delta = floor(2^32 / golden_ratio))
+static const uint32_t XXTEA_DELTA = 0x9E3779B9;
+static const uint32_t XXTEA_DELTA_ALT = 0x61C88647;
+
+// RC4 KSA loop bound patterns (cmp reg, 0x100)
+static const uint8_t RC4_PAT_1[] = {0x3D, 0x00, 0x01, 0x00, 0x00};           // cmp eax, 0x100
+static const uint8_t RC4_PAT_2[] = {0x81, 0xF8, 0x00, 0x01, 0x00, 0x00};    // cmp eax, 0x100 (modrm)
+static const uint8_t RC4_PAT_3[] = {0x81, 0xF9, 0x00, 0x01, 0x00, 0x00};    // cmp ecx, 0x100
+static const uint8_t RC4_PAT_4[] = {0x81, 0xFA, 0x00, 0x01, 0x00, 0x00};    // cmp edx, 0x100
+static const uint8_t RC4_PAT_5[] = {0x81, 0xFB, 0x00, 0x01, 0x00, 0x00};    // cmp ebx, 0x100
+static const uint8_t RC4_PAT_6[] = {0x48, 0x3D, 0x00, 0x01, 0x00, 0x00};    // cmp rax, 0x100
+static const uint8_t RC4_PAT_7[] = {0x48, 0x81, 0xF8, 0x00, 0x01, 0x00, 0x00}; // cmp rax, 0x100 (modrm)
+
+// Whirlpool S-box (first 32 bytes)
+static const uint8_t WHIRLPOOL_SBOX[32] = {
+    0x18, 0x23, 0xC6, 0xE8, 0x87, 0xB8, 0x01, 0x4F,
+    0x03, 0xD6, 0x34, 0x1E, 0x57, 0x72, 0x7A, 0xC0,
+    0xAC, 0x61, 0x35, 0x44, 0x3C, 0x22, 0x64, 0x19,
+    0xD3, 0x8B, 0x86, 0xC2, 0x9F, 0x08, 0xD5, 0xF7,
+};
+
+// RIPEMD-160 H0 initial values
+static const uint8_t RIPEMD160_H0[20] = {
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+    0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10,
+    0xF0, 0xE1, 0xD2, 0xC3,
+};
+
+// Camellia S-box (first 32 bytes)
+static const uint8_t CAMELLIA_SBOX[32] = {
+    0x70, 0x82, 0x2C, 0xEC, 0xB3, 0x27, 0xC0, 0xE5,
+    0x12, 0xA5, 0x1A, 0x0B, 0xA2, 0x0A, 0x14, 0xA8,
+    0x46, 0x06, 0x42, 0x3A, 0x08, 0x24, 0x16, 0x1E,
+    0xBA, 0xE0, 0x56, 0x22, 0x68, 0xC5, 0x73, 0x18,
+};
+
+// Serpent S-box (first 32 bytes from S0)
+static const uint8_t SERPENT_SBOX[32] = {
+    0x33, 0x32, 0x30, 0x31, 0x38, 0x39, 0x3B, 0x3A,
+    0x37, 0x36, 0x34, 0x35, 0x3E, 0x3F, 0x3D, 0x3C,
+    0x43, 0x42, 0x40, 0x41, 0x48, 0x49, 0x4B, 0x4A,
+    0x47, 0x46, 0x44, 0x45, 0x4E, 0x4F, 0x4D, 0x4C,
+};
+
+// Twofish P-box (first 32 bytes from P0)
+static const uint8_t TWOFISH_PBOX[32] = {
+    0xA9, 0x67, 0xB4, 0xD5, 0x2C, 0x6E, 0x31, 0x07,
+    0x40, 0x28, 0x5E, 0x3D, 0x65, 0xB8, 0x04, 0x8C,
+    0x96, 0x43, 0x6A, 0x32, 0x1C, 0x0C, 0x27, 0x53,
+    0x92, 0xCF, 0xE1, 0x4B, 0x7D, 0x39, 0x64, 0x5D,
+};
+
+// GOST S-box (first 16 bytes from S1)
+static const uint8_t GOST_SBOX[16] = {
+    0x09, 0x06, 0x03, 0x02, 0x08, 0x0B, 0x01, 0x07,
+    0x0A, 0x04, 0x0E, 0x0F, 0x0C, 0x00, 0x0D, 0x05,
+};
+
+// RC2 S-box (first 16 bytes)
+static const uint8_t RC2_SBOX[16] = {
+    0xD9, 0x78, 0xF9, 0xC4, 0x1D, 0x93, 0xEA, 0xDB,
+    0x7F, 0x2E, 0x30, 0xF2, 0xEC, 0x6D, 0x51, 0x5B,
+};
+
+// ChaCha/Salsa20 constants "expand 32-byte k"
+static const uint8_t CHACHA_CONSTANTS[16] = {
+    0x65, 0x78, 0x70, 0x61, 0x6E, 0x64, 0x20, 0x33,
+    0x32, 0x2D, 0x62, 0x79, 0x74, 0x65, 0x20, 0x6B,
+};
+
 std::vector<CryptoHit> FindCrypt3Engine::scanRegion(const uint8_t* data, size_t size) const {
     std::vector<CryptoHit> hits;
 
@@ -83,6 +153,78 @@ std::vector<CryptoHit> FindCrypt3Engine::scanRegion(const uint8_t* data, size_t 
         }
     }
 
+    // XXTEA/TEA DELTA constant (4 bytes, scan every 4-byte alignment)
+    for (size_t i = 0; i + 4 <= size; i += 4) {
+        if (checkXxtea(data, size, i)) {
+            uint32_t val = *reinterpret_cast<const uint32_t*>(data + i);
+            double conf = (val == XXTEA_DELTA) ? 0.85 : 0.70;
+            hits.push_back({static_cast<uintptr_t>(i), "XXTEA", conf, "TEA/XXTEA DELTA constant"});
+        }
+    }
+
+    // RC4 KSA patterns (instruction byte sequences)
+    for (size_t i = 0; i + 7 <= size; ++i) {
+        if (checkRc4Ksa(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "RC4", 0.75, "RC4 KSA loop bound (cmp reg, 0x100)"});
+        }
+    }
+
+    // Whirlpool S-box (32 bytes)
+    for (size_t i = 0; i + 32 <= size; ++i) {
+        if (checkWhirlpool(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "Whirlpool", 0.85, "Whirlpool S-box"});
+        }
+    }
+
+    // RIPEMD-160 H0 (20 bytes)
+    for (size_t i = 0; i + 20 <= size; ++i) {
+        if (checkRipemd160(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "RIPEMD-160", 0.90, "RIPEMD-160 H0 initial values"});
+        }
+    }
+
+    // Camellia S-box (32 bytes)
+    for (size_t i = 0; i + 32 <= size; ++i) {
+        if (checkCamellia(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "Camellia", 0.85, "Camellia S-box"});
+        }
+    }
+
+    // Serpent S-box (32 bytes)
+    for (size_t i = 0; i + 32 <= size; ++i) {
+        if (checkSerpent(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "Serpent", 0.80, "Serpent S-box"});
+        }
+    }
+
+    // Twofish P-box (32 bytes)
+    for (size_t i = 0; i + 32 <= size; ++i) {
+        if (checkTwofish(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "Twofish", 0.80, "Twofish P-box"});
+        }
+    }
+
+    // GOST S-box (16 bytes)
+    for (size_t i = 0; i + 16 <= size; ++i) {
+        if (checkGost(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "GOST", 0.80, "GOST S-box"});
+        }
+    }
+
+    // RC2 S-box (16 bytes)
+    for (size_t i = 0; i + 16 <= size; ++i) {
+        if (checkRc2(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "RC2", 0.80, "RC2 S-box"});
+        }
+    }
+
+    // ChaCha/Salsa20 constants (16 bytes)
+    for (size_t i = 0; i + 16 <= size; ++i) {
+        if (checkChacha(data, size, i)) {
+            hits.push_back({static_cast<uintptr_t>(i), "ChaCha/Salsa20", 0.90, "ChaCha/Salsa20 constants"});
+        }
+    }
+
     return hits;
 }
 
@@ -100,7 +242,11 @@ std::vector<CryptoHit> FindCrypt3Engine::scanFile(const std::string& filePath) c
 }
 
 std::vector<std::string> FindCrypt3Engine::getSupportedAlgorithms() const {
-    return {"AES", "DES", "SHA-256", "MD5", "Blowfish"};
+    return {
+        "AES", "DES", "SHA-256", "MD5", "Blowfish",
+        "XXTEA", "RC4", "Whirlpool", "RIPEMD-160", "Camellia",
+        "Serpent", "Twofish", "GOST", "RC2", "ChaCha/Salsa20"
+    };
 }
 
 bool FindCrypt3Engine::checkAesSbox(const uint8_t* data, size_t size, size_t offset) const {
@@ -134,6 +280,63 @@ bool FindCrypt3Engine::checkBlowfish(const uint8_t* data, size_t size, size_t of
     uint32_t p0 = *reinterpret_cast<const uint32_t*>(data + offset);
     uint32_t p1 = *reinterpret_cast<const uint32_t*>(data + offset + 4);
     return (p0 == 0x243f6a88 && p1 == 0x85a308d3);
+}
+
+bool FindCrypt3Engine::checkXxtea(const uint8_t* data, size_t size, size_t offset) const {
+    if (offset + 4 > size) return false;
+    uint32_t val = *reinterpret_cast<const uint32_t*>(data + offset);
+    return (val == XXTEA_DELTA || val == XXTEA_DELTA_ALT);
+}
+
+bool FindCrypt3Engine::checkRc4Ksa(const uint8_t* data, size_t size, size_t offset) const {
+    if (memcmp(data + offset, RC4_PAT_1, sizeof(RC4_PAT_1)) == 0) return true;
+    if (memcmp(data + offset, RC4_PAT_2, sizeof(RC4_PAT_2)) == 0) return true;
+    if (memcmp(data + offset, RC4_PAT_3, sizeof(RC4_PAT_3)) == 0) return true;
+    if (memcmp(data + offset, RC4_PAT_4, sizeof(RC4_PAT_4)) == 0) return true;
+    if (memcmp(data + offset, RC4_PAT_5, sizeof(RC4_PAT_5)) == 0) return true;
+    if (memcmp(data + offset, RC4_PAT_6, sizeof(RC4_PAT_6)) == 0) return true;
+    if (memcmp(data + offset, RC4_PAT_7, sizeof(RC4_PAT_7)) == 0) return true;
+    return false;
+}
+
+bool FindCrypt3Engine::checkWhirlpool(const uint8_t* data, size_t size, size_t offset) const {
+    if (offset + 32 > size) return false;
+    return memcmp(data + offset, WHIRLPOOL_SBOX, 32) == 0;
+}
+
+bool FindCrypt3Engine::checkRipemd160(const uint8_t* data, size_t size, size_t offset) const {
+    if (offset + 20 > size) return false;
+    return memcmp(data + offset, RIPEMD160_H0, 20) == 0;
+}
+
+bool FindCrypt3Engine::checkCamellia(const uint8_t* data, size_t size, size_t offset) const {
+    if (offset + 32 > size) return false;
+    return memcmp(data + offset, CAMELLIA_SBOX, 32) == 0;
+}
+
+bool FindCrypt3Engine::checkSerpent(const uint8_t* data, size_t size, size_t offset) const {
+    if (offset + 32 > size) return false;
+    return memcmp(data + offset, SERPENT_SBOX, 32) == 0;
+}
+
+bool FindCrypt3Engine::checkTwofish(const uint8_t* data, size_t size, size_t offset) const {
+    if (offset + 32 > size) return false;
+    return memcmp(data + offset, TWOFISH_PBOX, 32) == 0;
+}
+
+bool FindCrypt3Engine::checkGost(const uint8_t* data, size_t size, size_t offset) const {
+    if (offset + 16 > size) return false;
+    return memcmp(data + offset, GOST_SBOX, 16) == 0;
+}
+
+bool FindCrypt3Engine::checkRc2(const uint8_t* data, size_t size, size_t offset) const {
+    if (offset + 16 > size) return false;
+    return memcmp(data + offset, RC2_SBOX, 16) == 0;
+}
+
+bool FindCrypt3Engine::checkChacha(const uint8_t* data, size_t size, size_t offset) const {
+    if (offset + 16 > size) return false;
+    return memcmp(data + offset, CHACHA_CONSTANTS, 16) == 0;
 }
 
 }  // namespace omnibyte::deob

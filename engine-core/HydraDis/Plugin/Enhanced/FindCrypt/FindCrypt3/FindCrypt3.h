@@ -47,6 +47,36 @@ private:
 
     /// Check for Blowfish S-box at offset.
     bool checkBlowfish(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for XXTEA/TEA DELTA constant at offset.
+    bool checkXxtea(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for RC4 KSA pattern (cmp reg, 0x100) at offset.
+    bool checkRc4Ksa(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for Whirlpool S-box at offset.
+    bool checkWhirlpool(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for RIPEMD-160 H0 constants at offset.
+    bool checkRipemd160(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for Camellia S-box at offset.
+    bool checkCamellia(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for Serpent S-box at offset.
+    bool checkSerpent(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for Twofish P-box at offset.
+    bool checkTwofish(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for GOST S-box at offset.
+    bool checkGost(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for RC2 S-box at offset.
+    bool checkRc2(const uint8_t* data, size_t size, size_t offset) const;
+
+    /// Check for ChaCha/Salsa20 constants at offset.
+    bool checkChacha(const uint8_t* data, size_t size, size_t offset) const;
 };
 
 }  // namespace omnibyte::deob
