@@ -36,7 +36,7 @@ static const OpcodeSubstitution OPCODE_SUBSTITUTIONS[] = {
 class DeobfuscatePlugin : public IPlugin {
 public:
     std::string name() const override { return "Deobfuscate"; }
-    std::string version() const override { return "2.0.0"; }
+    std::string version() const override { return "3.0.0"; }
 
     bool onLoad() override { return true; }
 
@@ -61,7 +61,8 @@ public:
                     first = false;
                     output << "{\"type\":\"xor_obfuscation\","
                            << "\"address\":\"0x" << std::hex << instr.address << "\","
-                           << "\"instruction\":\"" << escapeJson(instr.mnemonic + " " + instr.opStr) << "\"}";
+                           << "\"instruction\":\"" << escapeJson(instr.mnemonic + " " + instr.opStr) << "\","
+                           << "\"confidence\":0.8}";
                 }
 
                 if (instr.mnemonic == "ldrb" || instr.mnemonic == "ldrh" || instr.mnemonic == "ldr") {
@@ -74,7 +75,8 @@ public:
                             output << "{\"type\":\"string_decryption\","
                                    << "\"address\":\"0x" << std::hex << instr.address << "\","
                                    << "\"loadInstruction\":\"" << escapeJson(instr.mnemonic + " " + instr.opStr) << "\","
-                                   << "\"xorInstruction\":\"" << escapeJson(next->mnemonic + " " + next->opStr) << "\"}";
+                                   << "\"xorInstruction\":\"" << escapeJson(next->mnemonic + " " + next->opStr) << "\","
+                                   << "\"confidence\":0.9}";
                         }
                     }
                 }
@@ -88,8 +90,42 @@ public:
                                << "\"address\":\"0x" << std::hex << instr.address << "\","
                                << "\"obfuscated\":\"" << escapeJson(sub.obfuscated) << "\","
                                << "\"canonical\":\"" << escapeJson(sub.canonical) << "\","
-                               << "\"description\":\"" << escapeJson(sub.description) << "\"}";
+                               << "\"description\":\"" << escapeJson(sub.description) << "\","
+                               << "\"confidence\":0.7}";
                         break;
+                    }
+                }
+
+                if (instr.mnemonic == "nop" ||
+                    (instr.mnemonic == "mov" && instr.opStr.find("x0") != std::string::npos &&
+                     instr.opStr.find(", x0") != std::string::npos)) {
+                    if (!first) output << ",";
+                    first = false;
+                    output << "{\"type\":\"junk_code\","
+                           << "\"address\":\"0x" << std::hex << instr.address << "\","
+                           << "\"instruction\":\"" << escapeJson(instr.mnemonic + " " + instr.opStr) << "\","
+                           << "\"confidence\":0.95}";
+                }
+
+                if (instr.mnemonic == "str" || instr.mnemonic == "stp") {
+                    std::string reg;
+                    size_t spacePos = instr.opStr.find(' ');
+                    if (spacePos != std::string::npos) {
+                        reg = instr.opStr.substr(0, spacePos);
+                    }
+                    auto next = std::find_if(instrs.begin(), instrs.end(),
+                        [&](const auto& i) { return i.address > instr.address; });
+                    if (next != instrs.end() && !reg.empty()) {
+                        if ((next->mnemonic == "str" || next->mnemonic == "stp") &&
+                            next->opStr.find(reg) != std::string::npos) {
+                            if (!first) output << ",";
+                            first = false;
+                            output << "{\"type\":\"dead_store\","
+                                   << "\"address\":\"0x" << std::hex << instr.address << "\","
+                                   << "\"instruction\":\"" << escapeJson(instr.mnemonic + " " + instr.opStr) << "\","
+                                   << "\"overwrittenBy\":\"0x" << std::hex << next->address << "\","
+                                   << "\"confidence\":0.85}";
+                        }
                     }
                 }
             }
