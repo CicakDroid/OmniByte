@@ -14,6 +14,9 @@ enum class AstNodeType {
     CALL,
     ASSIGN,
     BRANCH,
+    ARITH,
+    LOAD,
+    STORE,
     UNKNOWN
 };
 
@@ -183,9 +186,22 @@ private:
                 block->address = addr;
                 for (const auto* instr : instrs) {
                     auto* leaf = new AstNode();
-                    leaf->type = AstNodeType::UNKNOWN;
                     leaf->address = instr->address;
                     leaf->label = instr->mnemonic + " " + instr->opStr;
+
+                    if (isArithmetic(instr->mnemonic)) {
+                        leaf->type = AstNodeType::ARITH;
+                    } else if (isLoad(instr->mnemonic)) {
+                        leaf->type = AstNodeType::LOAD;
+                    } else if (isStore(instr->mnemonic)) {
+                        leaf->type = AstNodeType::STORE;
+                    } else if (instr->mnemonic == "mov" || instr->mnemonic == "orr" ||
+                               instr->mnemonic == "and" || instr->mnemonic == "eor") {
+                        leaf->type = AstNodeType::ASSIGN;
+                    } else {
+                        leaf->type = AstNodeType::UNKNOWN;
+                    }
+
                     block->children.push_back(leaf);
                 }
                 root->children.push_back(block);
@@ -219,6 +235,20 @@ private:
 
     bool isUnconditionalBranch(const std::string& m) const {
         return m == "b" || m == "br";
+    }
+
+    bool isArithmetic(const std::string& m) const {
+        return m == "add" || m == "sub" || m == "mul" || m == "sdiv" ||
+               m == "udiv" || m == "smlull" || m == "umull";
+    }
+
+    bool isLoad(const std::string& m) const {
+        return m == "ldr" || m == "ldrb" || m == "ldrh" || m == "ldp" ||
+               m == "ldrsb" || m == "ldrsh";
+    }
+
+    bool isStore(const std::string& m) const {
+        return m == "str" || m == "strb" || m == "strh" || m == "stp";
     }
 
     uint64_t parseTarget(const std::string& opStr) const {
@@ -276,6 +306,9 @@ private:
             case AstNodeType::CALL:     return "call";
             case AstNodeType::ASSIGN:   return "assign";
             case AstNodeType::BRANCH:   return "branch";
+            case AstNodeType::ARITH:    return "arith";
+            case AstNodeType::LOAD:     return "load";
+            case AstNodeType::STORE:    return "store";
             default:                    return "unknown";
         }
     }
