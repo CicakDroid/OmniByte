@@ -1,4 +1,4 @@
-https://github.com/CicakDroid/OmniByte/blob/3759e00d119ccb861604479fddf3d8b311c1d793/omnibyte-icon-chip-angkasa.svg
+
 
 # OmniByte
 
