@@ -406,6 +406,112 @@ struct MonoBehaviour_Methods {
 6. Patch/modify sesuai kebutuhan
 ```
 
+### Metadata dalam Game Engine Lain
+
+Setiap engine memiliki mekanisme metadata sendiri, bukan `globalmetadata.dat` khusus Unity IL2CPP:
+
+| Engine | Metadata System | Lokasi/File |
+|--------|-----------------|-------------|
+| **Unity IL2CPP** | `global-metadata.dat` | `assets/bin/Data/Managed/Metadata/` |
+| **Unity Mono** | `global-metadata.dat` (format berbeda) | `assets/bin/Data/Managed/Metadata/` + DLL files |
+| **Unreal Engine** | GNames + GObjects tables | `.pak` files + binary sections (`.usmap` untuk serialization) |
+| **Godot** | `.godot/` directory + `.tres`/`.tscn` resources | `res://.godot/` + binary `.scn`/`.res` |
+| **GameMaker** | YY/JSON resources | `data.win` (compiled) + `.yy` metadata files |
+| **Cocos2d** | `project.json` + `jsb_*.json` | `src/` (scripts) + `res/` (resources) |
+| **Source 2** | VPK + VTEX/DMX/VMAT | `.vpk` paket files |
+
+#### Unreal Engine
+- **GNames**: String table berisi semua nama (class, method, property)
+- **GObjects**: Array UObject instances
+- **`.pak`**: Package file berisi assets + index
+- **`.usmap`**: Serialized reflection data untuk modding
+- Tidak ada satu file `metadata.dat` — data tersebar di binary + pak files
+
+#### Godot
+- **`.godot/`**: Internal directory berisi import database
+- **`.tres`/`.tscn`**: Text-based resource/scene files
+- **`.scn`/`.res`**: Binary resource files
+- **`project.godot`**: Project settings (bukan runtime metadata)
+- Godot 4.x: Binary serialization format berubah total dari 3.x
+
+#### GameMaker
+- **`data.win`**: Compiled game data (sprites, sounds, code, objects)
+- **`.yy` files**: JSON metadata untuk setiap resource
+- **`options.ini`**: Platform-specific settings
+- GameMaker Studio 2: Format berbeda dari GMS 1.x
+
+#### Cocos2d
+- **`project.json`**: Engine configuration
+- **`jsb_*.json`**: JavaScript binding metadata
+- **`res/`**: Resources (tidak ada centralized metadata)
+- Cocos Creator: `.fire`/`.scene` files + `cocos2d-x` engine
+
+### Metadata Aplikasi Android Non-Game
+
+Semua aplikasi Android memiliki metadata, bukan hanya game. Perbedaannya terletak pada jenis dan lokasi metadata:
+
+| Metadata | Lokasi | Fungsi |
+|----------|--------|--------|
+| `AndroidManifest.xml` | Root APK | Permissions, activities, services, receivers |
+| `resources.arsc` | Root APK | Compiled resources (strings, layouts, styles) |
+| `classes.dex` | Root APK | Compiled Java/Kotlin bytecode |
+| `res/` | Directory | Layout XML, drawable, values |
+| `META-INF/` | Directory | Signing certificates, manifest |
+| `lib/` | Directory | Native libraries (.so) |
+| `assets/` | Directory | Raw assets (user-defined) |
+| `BuildConfig.class` | In DEX | Build metadata (version, debug flag) |
+| `R.class` | In DEX | Resource ID mappings |
+
+Contoh struktur APK non-game:
+```
+myapp.apk
+├── AndroidManifest.xml          → metadata aplikasi
+├── classes.dex                  → compiled code
+├── resources.arsc               → compiled resources
+├── res/
+│   ├── layout/activity_main.xml
+│   ├── values/strings.xml
+│   └── drawable/icon.png
+├── META-INF/
+│   ├── CERT.SF
+│   ├── CERT.RSA
+│   └── MANIFEST.MF
+└── lib/
+    └── arm64-v8a/
+        └── libnative.so
+```
+
+### Jenis Metadata dalam Aplikasi Android
+
+Secara garis besar ada 5 kategori utama metadata Android:
+
+#### 1. Application Metadata
+- `AndroidManifest.xml`: Nama paket, versi, permissions, components
+- `BuildConfig.class`: Build type, version code, debug status
+- Signature certificates
+
+#### 2. Resource Metadata
+- `resources.arsc`: Compiled resource table (string pool, layout references, drawable references)
+- `res/` directory: XML layouts, drawables, values
+- Resource IDs (R.java/R.class mappings)
+
+#### 3. Code Metadata
+- `classes.dex`: Compiled bytecode
+- `lib/*.so`: Native libraries (JNI bindings)
+- Method/field definitions, class hierarchy
+
+#### 4. Asset Metadata (user-defined)
+- `assets/` directory: Raw files
+- Database files (SQLite)
+- Configuration files (JSON, XML, SharedPreferences)
+- Game-specific: `global-metadata.dat`, level data, save files
+
+#### 5. Security Metadata
+- `META-INF/`: Signing certificates, manifest hash
+- Play Integrity API tokens
+- SafetyNet/Play Integrity attestation data
+- Encrypted preferences (if using AndroidX Security)
+
 ---
 
 ## 10. Kesimpulan
