@@ -16,7 +16,8 @@
 6. [Pointer Coverage](#6-pointer-coverage)
 7. [Sanitizer Mechanism](#7-sanitizer-mechanism)
 8. [Basic Heap Allocator](#8-basic-heap-allocator)
-9. [Kesimpulan](#9-kesimpulan)
+9. [Metadata (IL2CPP/globalmetadata.dat)](#9-metadata-il2cppglobalmetadatadat)
+10. [Kesimpulan](#10-kesimpulan)
 
 ---
 
@@ -298,7 +299,116 @@ char* b = malloc(16);  // header: [size=17] [fd] [bk] + data[16]
 
 ---
 
-## 9. Kesimpulan
+## 9. Metadata (IL2CPP/globalmetadata.dat)
+
+### Definisi
+`globalmetadata.dat` adalah file metadata yang dihasilkan oleh Unity IL2CPP (Intermediate Language to C++) build pipeline. File ini berisi semua informasi string, type definitions, method names, dan field names yang dibutuhkan oleh IL2CPP runtime.
+
+### Struktur Internal
+
+```
+globalmetadata.dat
+├── String Literals        → semua string dalam program
+├── Type Definitions       → class/interface/struct/enum definitions
+├── Method Definitions     → method signatures, parameters, return types
+├── Field Definitions      → field names, types, offsets
+├── Parameter Definitions  → parameter names dan types
+├── Generic Containers     → generic type definitions (List<T>, Dictionary<K,V>)
+├── Image Definitions      → assembly references (Assembly-CSharp.dll, mscorlib.dll)
+└── Usage Hints            → optimization metadata
+```
+
+### Kenapa Penting untuk Reverse Engineering?
+
+Ketika Unity game di-compile dengan IL2CPP:
+
+1. C# code → C++ code (IL2CPP transpilation)
+2. C++ → Native binary (.so library)
+3. Metadata disimpan terpisah di `globalmetadata.dat`
+
+Tanpa metadata ini, binary native hanya berupa raw memory operations — tidak ada nama class, method, atau field. Metadata memberikan symbolic information yang memungkinkan analisis.
+
+### Hubungan dengan DEX/APK
+
+| Komponen | Isi | Fungsi |
+|----------|-----|--------|
+| `classes.dex` | Compiled Java/Kotlin bytecode | Code execution (traditional Android) |
+| `lib/arm64-v8a/libil2cpp.so` | Native C++ compiled code | IL2CPP runtime execution |
+| `assets/globalmetadata.dat` | Type/method/field metadata | Symbolic info untuk il2cpp runtime |
+| `assets/bin/Data/Managed/Metadata/global-metadata.dat` | Sama, path berbeda | Unity 2020+ layout |
+
+### Cara Kerja IL2CPP Runtime
+
+```
+┌─────────────────────────────────────────────┐
+│  libil2cpp.so (native code)                │
+│  - Compiled C++ functions                  │
+│  - No symbol names (stripped)              │
+└──────────────┬──────────────────────────────┘
+               │ mmap/load
+               ▼
+┌─────────────────────────────────────────────┐
+│  globalmetadata.dat (mmap'd at runtime)    │
+│  - String pool: "Update", "Start", etc.    │
+│  - Type definitions: MonoBehaviour         │
+│  - Method table: Update() → 0x12345        │
+└─────────────────────────────────────────────┘
+```
+
+### Tools untuk Analisis Metadata
+
+| Tool | Fungsi |
+|------|--------|
+| **Il2CppDumper** | Ekstrak metadata → C# stubs + IDA/Ghidra headers |
+| **il2cpp-inspector** | UI untuk analisis metadata |
+| **Cpp2IL** | Reverse engineer metadata ke source |
+| **GameGuardian** | Runtime memory patching (baca metadata via memory) |
+
+### Contoh: Il2CppDumper Output
+
+```cpp
+// Il2CppDumper menghasilkan:
+struct MonoBehaviour_StaticFields {
+    int32_t ___instanceID;  // offset 0x10
+    String_t* ___name;      // offset 0x18
+};
+
+struct MonoBehaviour_Methods {
+    void (*Update)(MonoBehaviour_t*, float);  // 0x12345678
+    void (*Start)(MonoBehaviour_t*);          // 0x12345690
+};
+```
+
+### Metadata Versions
+
+| Unity Version | Metadata Format | Lokasi |
+|---------------|-----------------|--------|
+| Unity 5.x | `global-metadata.dat` (v14) | `assets/bin/Data/` |
+| Unity 2017-2019 | `global-metadata.dat` (v19-24) | `assets/bin/Data/Managed/Metadata/` |
+| Unity 2020+ | `global-metadata.dat` (v27-29) | `assets/bin/Data/Managed/Metadata/` |
+| Unity 2022+ | `global-metadata.dat` (v29) | `assets/bin/Data/Managed/Metadata/` |
+
+### Security Implications
+
+1. **Anti-tamper**: Beberapa game encrypt `globalmetadata.dat` → butuh decrypt sebelum dump
+2. **String obfuscation**: String di metadata bisa di-obfuscate → perlu deobfuscation
+3. **Metadata validation**: Runtime check integrity → patching metadata = crash
+4. **Code stripping**: Unused types/methods di-strip → metadata lebih kecil
+
+### Workflow Reverse Engineering
+
+```
+1. Extract APK
+2. Find globalmetadata.dat
+3. Run Il2CppDumper → dapat C# stubs
+4. Analisis libil2cpp.so di IDA/Ghidra
+5. Cross-reference metadata dengan native code
+6. Patch/modify sesuai kebutuhan
+```
+
+---
+
+## 10. Kesimpulan
 
 ### Ringkasan Konsep
 
@@ -312,6 +422,7 @@ char* b = malloc(16);  // header: [size=17] [fd] [bk] + data[16]
 | Pointer Coverage | Mendeteksi memory corruption via analisis pointer |
 | Sanitizer | Deteksi runtime buffer overflow, UAF, dll |
 | Heap Allocator | Memahami exploitation primitive di heap |
+| Metadata (IL2CPP) | Memahami symbolic info di Unity/game binaries |
 
 ### Keterkaitan Antar Konsep
 
@@ -324,6 +435,7 @@ Semua konsep ini saling terkait dalam workflow reverse engineering:
 5. **Memory Segmentation** memberikan pemahaman tentang layout program
 6. **Pointer Coverage** dan **Sanitizer** membantu mendeteksi vulnerability
 7. **Heap Allocator** memahami primitive untuk exploitation
+8. **Metadata** memberikan symbolic information untuk analisis game/mobile binaries
 
 ### Relevansi untuk Pengembangan OmniByte
 
@@ -333,6 +445,7 @@ Pemahaman terhadap konsep-konsep ini penting untuk:
 - Memahami teknik exploitation modern
 - Menganalisis binary tanpa source code
 - Membangun sistem pertahanan yang robust
+- Menganalisis game/mobile applications (Unity IL2CPP, Android APK)
 
 ---
 
