@@ -1,8 +1,9 @@
 # Laporan Penelitian: Konsep Inti Reverse Engineering untuk Pengembangan OmniByte
 
 **Nama Proyek:** Pengembangan OmniByte
-**Tanggal:** 2026-09-05
+**Tanggal:** 2026-09-05 (Updated)
 **Status:** Final
+**Revisi:** 2.0 - Penambahan 16 konsep reverse engineering
 
 ---
 
@@ -17,7 +18,23 @@
 7. [Sanitizer Mechanism](#7-sanitizer-mechanism)
 8. [Basic Heap Allocator](#8-basic-heap-allocator)
 9. [Metadata (IL2CPP/globalmetadata.dat)](#9-metadata-il2cppglobalmetadatadat)
-10. [Kesimpulan](#10-kesimpulan)
+10. [Recursive Binary Unpacker](#10-recursive-binary-unpacker)
+11. [Section Carver](#11-section-carver)
+12. [Entropy](#12-entropy)
+13. [IR (Intermediate Representation)](#13-ir-intermediate-representation)
+14. [Stacktrace](#14-stacktrace)
+15. [Patching](#15-patching)
+16. [Compiler](#16-compiler)
+17. [Packer](#17-packer)
+18. [Root Checker](#18-root-checker)
+19. [Anti Debug](#19-anti-debug)
+20. [Anti Cheat](#20-anti-cheat)
+21. [Play Integrity Check](#21-play-integrity-check)
+22. [SSL Unpinning](#22-ssl-unpinning)
+23. [Signature](#23-signature)
+24. [Deobfuscation](#24-deobfuscation)
+25. [Hooking](#25-hooking)
+26. [Kesimpulan](#26-kesimpulan)
 
 ---
 
@@ -514,7 +531,820 @@ Secara garis besar ada 5 kategori utama metadata Android:
 
 ---
 
-## 10. Kesimpulan
+## 10. Recursive Binary Unpacker
+
+### Definisi
+Recursive binary unpacker adalah tool yang membongkar (unpack) binary yang telah dipacking secara rekursif — artinya ia terus membongkar lapisan demi lapisan sampai mendapatkan binary asli (original payload).
+
+### Cara Kerja
+```
+Packed Binary (Lapisan 3)
+  → Unpack → Packed Binary (Lapisan 2)
+    → Unpack → Packed Binary (Lapisan 1)
+      → Unpack → Original Binary (Unpacked)
+```
+
+### Kenapa Rekursif?
+Banyak packer modern menggunakan multi-layer packing (UPX + Themida + custom). Unpacker biasa hanya menghapus 1 lapisan. Recursive unpacker mendeteksi apakah hasil unpack masih ter-packed, lalu loop sampai benar-benar unpacked.
+
+### Contoh Implementasi
+- **Unipacker** — framework multi-packer
+- Custom script yang check entropy setiap stage (entropy tinggi = masih packed)
+
+---
+
+## 11. Section Carver
+
+### Definisi
+Section carver adalah tool yang memotong/mengekstrak section tertentu dari binary PE/ELF berdasarkan header metadata.
+
+### Kenapa Dibutuhkan?
+- Binary PE punya section: `.text` (code), `.rdata` (read-only data), `.data`, `.rsrc` (resources), `.reloc`
+- Kadang kita hanya butuh `.text` untuk analisis kode, atau `.rsrc` untuk extract icon/string
+- Section carver bisa extract section dari corrupted binary atau dari memory dump
+
+### Contoh Section PE
+```
+Section Table:
+  .text   → 0x1000  size: 0x5000  (executable code)
+  .rdata  → 0x6000  size: 0x2000  (constants, strings)
+  .data   → 0x8000  size: 0x1000  (global variables)
+  .rsrc   → 0x9000  size: 0x3000  (resources)
+```
+
+---
+
+## 12. Entropy
+
+### Definisi
+Entropy adalah ukuran ketidakpastian/randomitas dalam data. Dalam reverse engineering, entropy digunakan untuk mendeteksi apakah bagian binary telah di-enkripsi atau di-compress.
+
+### Skala Shannon Entropy (0-8 byte)
+
+| Entropy | Interpretasi |
+|---------|--------------|
+| 0.0 - 1.0 | Data kosong/null bytes |
+| 1.0 - 4.0 | Data terstruktur (code, teks) |
+| 4.0 - 6.0 | Data compress (zip, gzip) |
+| 6.0 - 7.5 | Data terenkripsi (AES, XOR) |
+| 7.5 - 8.0 | Full random (encryption/padding) |
+
+### Contoh Implementasi
+```python
+import math
+from collections import Counter
+
+def shannon_entropy(data):
+    if not data: return 0
+    counter = Counter(data)
+    length = len(data)
+    return -sum((count/length) * math.log2(count/length) 
+                for count in counter.values())
+
+# Entropy > 7.0 → kemungkinan terenkripsi/packed
+```
+
+### Visualisasi
+Banyak tools menampilkan entropy sebagai grafik warna (heatmap) di sepanjang binary — area merah = entropy tinggi (terenkripsi), area biru = entropy rendah (code biasa).
+
+---
+
+## 13. IR (Intermediate Representation)
+
+### Definisi
+Intermediate Representation (IR) adalah bahasa perantara yang dibuat oleh compiler/decompiler antara source code dan machine code. IR bersifat tool-agnostic — bisa diproses tanpa peduli bahasa sumber atau target arch.
+
+### Posisi IR dalam Pipeline
+```
+Source Code → [Frontend] → IR → [Optimizer] → IR → [Backend] → Machine Code
+                  ↑                                    ↓
+           (C, Rust, Go)                     (x86, ARM, RISC-V)
+```
+
+### Jenis-jenis IR
+
+| Jenis | Contoh | Karakteristik |
+|-------|--------|---------------|
+| SSA (Static Single Assignment) | LLVM IR, TurboFan | Setiap variabel hanya di-assign sekali |
+| Three-Address Code | GCC GIMPLE | Operasi 3 operand |
+| P-code | Ghidra | 4-bit operand + opcode |
+| ESIL | Rizin | Stack-based, virtual machine |
+| Bytecode | JVM, CLR | Target VM, bukan CPU fisik |
+
+### Contoh LLVM IR
+```llvm
+define i32 @add(i32 %a, i32 %b) {
+entry:
+  %result = add i32 %a, %b
+  ret i32 %result
+}
+```
+
+### Mengapa IR Penting dalam RE?
+- Decompiler (Ghidra, IDA) mengkonversi machine code → IR → pseudocode
+- IR memungkinkan optimasi dan analisis tanpa peduli target arch
+- Symbolic execution engine bekerja di level IR
+
+---
+
+## 14. Stacktrace
+
+### Definisi
+Stacktrace (stack backtrace) adalah rekaman urutan fungsi yang dipanggil sampai titik tertentu (error/crash/breakpoint). Menunjukkan alamat return address di setiap frame stack.
+
+### Struktur Stack Frame (x86-64)
+```
+[Higher Address]
+┌─────────────────┐
+│  Local vars     │ ← RBP + offset
+├─────────────────┤
+│  Saved RBP      │ ← RBP (Frame Pointer)
+├─────────────────┤
+│  Return Address │ ← RBP + 8
+├─────────────────┤
+│  Arguments      │ ← RBP + 16
+└─────────────────┘
+[Lower Address]
+```
+
+### Contoh Stacktrace Crash
+```
+#0  0x00007f8a12345678 in crash_function () from libtarget.so
+#1  0x00007f8a12345abc in caller_function () from libtarget.so
+#2  0x00007f8a12345def in main () from target_app
+#3  0x00007f8a00123456 in __libc_start_call_main () from libc.so.6
+```
+
+### Penggunaan dalam RE
+- **Symbolic stack analysis:** Mencari vulnerability seperti buffer overflow (return address overwritten)
+- **Anti-debug detection:** Memeriksa stack frame untuk mendeteksi hooking (return address berubah)
+- **Crash analysis:** Melacak origin crash sampai ke source code
+
+---
+
+## 15. Patching
+
+### Definisi
+Patching adalah mengubah byte tertentu dalam binary untuk memodifikasi perilaku program tanpa compile ulang.
+
+### Jenis-jenis Patching
+
+#### a) Binary Patching (Static)
+Mengubah file binary langsung:
+```
+Original:   E8 XX XX XX XX    (call function_A)
+Patched:    E9 XX XX XX XX    (jmp function_B)
+             90                (nop - if needed)
+```
+
+#### b) Memory Patching (Dynamic)
+Mengubah memory process saat runtime:
+```c
+DWORD oldProtect;
+VirtualProtect(addr, 5, PAGE_EXECUTE_READWRITE, &oldProtect);
+addr[0] = 0xE9;  // JMP opcode
+*(DWORD*)(addr+1) = (DWORD)hookFunc - (DWORD)addr - 5;
+VirtualProtect(addr, 5, oldProtect, &oldProtect);
+```
+
+#### c) Runtime Patching (Hot-patching)
+- **detour** (MSVC): Menggunakan trampoline
+- **PLT/GOT patching** (Linux): Mengubah function pointer di Procedure Linkage Table
+- **VTable hooking**: Mengubah virtual function pointer
+
+---
+
+## 16. Compiler
+
+### Definisi
+Compiler adalah program yang menerjemahkan source code bahasa tingkat tinggi menjadi machine code (atau IR → machine code).
+
+### Pipeline Compiler Modern
+```
+Source Code
+    ↓ [Lexical Analysis - Tokenizer]
+Tokens
+    ↓ [Parsing - Syntax Analysis]
+AST (Abstract Syntax Tree)
+    ↓ [Semantic Analysis]
+Typed AST
+    ↓ [IR Generation]
+IR (LLVM IR, GCC Gimple)
+    ↓ [Optimization Passes]
+Optimized IR
+    ↓ [Code Generation]
+Machine Code / Assembly
+    ↓ [Assembly + Linking]
+Executable (PE/ELF)
+```
+
+### Pentingnya Compiler dalam RE
+- **Decompiler** bekerja terbalik (reverse): Machine Code → IR → Pseudocode
+- Memahami compiler optimization membantu memahami generated code
+- **Compiler identification:** Identifikasi compiler dari binary signature (MSVC, GCC, Clang, LLVM)
+- **Optimization level:** `-O0` vs `-O2` vs `-O3` sangat mempengaruhi readable output
+
+---
+
+## 17. Packer
+
+### Definisi
+Packer adalah tool yang mengompresi/mentransformasi binary untuk melindungi dari analisis, reverse engineering, atau pembajakan.
+
+### Jenis-jenis Packer
+
+| Kategori | Contoh | Karakteristik |
+|----------|--------|---------------|
+| **Compressor** | UPX, ASPack | Compress untuk ukuran lebih kecil |
+| **Protector** | Themida, VMProtect, Enigma | Enkripsi + anti-debug + anti-RE |
+| **Virtualizer** | Themida VM, TinselCode | Kode dijalankan di VM custom |
+| **Obfuscator** | Obfuscator-LLVM, Tigress | Sulitkan analisis statis |
+
+### Alur Kerja Packer
+```
+Original Binary
+    ↓ [Packing]
+Packed Binary (+ stub loader)
+    ↓ [Runtime - Loader executes]
+Decrypted/Decompressed → Original Binary in Memory
+    ↓ [Execution]
+Original Code Runs
+```
+
+### Deteksi Packer
+- Entropy analysis (entropy tinggi = packed)
+- Packer signatures (UPX magic bytes: `UPX!`)
+- Import table analysis (packed binary punya import minim)
+
+---
+
+## 18. Root Checker
+
+### Definisi
+Root checker adalah mekanisme yang mendeteksi apakah perangkat Android telah di-root (memiliki akses superuser).
+
+### Metode Deteksi
+
+#### a) File-based Detection
+```java
+String[] paths = {
+    "/system/bin/su", "/system/xbin/su",
+    "/sbin/su", "/data/local/xbin/su"
+};
+for (String path : paths) {
+    if (new File(path).exists()) {
+        return true; // rooted
+    }
+}
+```
+
+#### b) Package-based Detection
+```java
+String[] packages = {
+    "com.topjohnwu.magisk",
+    "eu.chainfire.supersu",
+    "com.koushikdutta.superuser"
+};
+// Check via PackageManager
+```
+
+#### c) Build Property Detection
+```java
+String buildTags = Build.TAGS;
+if (buildTags.contains("test-keys")) {
+    return true; // dev build = likely rooted
+}
+```
+
+#### d) Binary Execution Detection
+```java
+Runtime.getRuntime().exec("su -c id");
+// Jika exit code == 0 → rooted
+```
+
+---
+
+## 19. Anti Debug
+
+### Definisi
+Anti debug adalah mekanisme yang mendeteksi/mencegah debugger terhubung ke process.
+
+### Metode Deteksi
+
+#### a) API-based Detection
+```c
+// Windows
+if (IsDebuggerPresent()) { exit(1); }
+
+// Linux
+if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1) {
+    exit(1);
+}
+```
+
+#### b) Timing-based Detection
+```c
+DWORD start = GetTickCount();
+// ... code block yang di-debug ...
+DWORD end = GetTickCount();
+if ((end - start) > THRESHOLD) {
+    // Kemungkinan di-debug
+}
+```
+
+#### c) Hardware Breakpoint Detection
+```c
+CONTEXT ctx;
+ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+GetThreadContext(GetCurrentThread(), &ctx);
+if (ctx.Dr0 || ctx.Dr1 || ctx.Dr2 || ctx.Dr3) {
+    // Hardware breakpoint detected
+}
+```
+
+#### d) Exception-based Detection
+```c
+__try {
+    RaiseException(EXCEPTION_BREAKPOINT, 0, 0, NULL);
+} __except(1) {
+    // Debugger menangkap exception = normal
+}
+```
+
+#### e) Process/Environment Checks
+- Cek parent process (debugger biasanya parent)
+- Cek environment variables
+- Cek window titles (x64dbg, OllyDbg)
+- Cek loaded DLLs/modules
+
+---
+
+## 20. Anti Cheat
+
+### Definisi
+Anti cheat adalah sistem yang mendeteksi dan mencegah kecurangan dalam game online.
+
+### Tingkatan Anti-Cheat
+
+| Level | Contoh | Metode |
+|-------|--------|--------|
+| **User-mode** | Custom hooks | Deteksi memory reading/writing |
+| **Kernel-mode** | EasyAntiCheat, Vanguard | Driver-level monitoring |
+| **Hardware** | TPM, Secure Boot | Hardware attestation |
+| **Server-side** | Server validation | Sanity check, behavior analysis |
+
+### Metode Deteksi
+1. **Memory scanning:** Deteksi modified values (health, ammo, dll)
+2. **Speed hack detection:** Bandingkan game timer vs system timer
+3. **Aimbots:** Analisis pattern mouse movement
+4. **Wallhacks:** Deteksi increased render distance/FOV
+5. **DLL injection:** Cek loaded modules, integrity check
+6. **Function hooking:** Cek return address integrity
+
+---
+
+## 21. Play Integrity Check
+
+### Definisi
+Play Integrity Check adalah API Google Play yang memverifikasi integritas perangkat dan instalasi app untuk mendeteksi rooting, debugging, dan tampering.
+
+### Tingkatan Verifikasi
+```
+INTEGRITY_BASIC:
+  → Verifikasi bahwa app legitimate (tidak di-repackage)
+  → Verifikasi bahwa device tidak rooted
+
+INTEGRITY_DEVICE:
+  → + Verifikasi bootloader locked
+  → + Verifikasi system integrity (SafetyNet-like)
+
+INTEGRITY_VERDICT → nonce, timestamp, details
+```
+
+### Penggunaan
+- Menentukan apakah user bisa mengakses fitur tertentu
+- Deteksi kecurangan online banking/payment apps
+- Compliance (perangkat harus terverifikasi)
+
+---
+
+## 22. SSL Unpinning
+
+### Definisi
+SSL unpinning adalah mekanisme yang memaksa aplikasi menerima certificate yang tidak dipinned (tidak di-whitelist), memungkinkan MITM (Man-in-the-Middle) untuk traffic analysis.
+
+### SSL Pinning vs Unpinning
+```
+Normal (Pinned):
+  App → SSL → Server (hanya terima certificate yang di-pin)
+
+Unpinned:
+  App → SSL → Proxy (menerima certificate apapun)
+  Proxy → SSL → Server (MITM untuk analisis traffic)
+```
+
+### Metode Unpinning
+
+#### a) Frida Script (Dynamic)
+```javascript
+Java.perform(function() {
+    var TrustManager = Java.registerClass({
+        name: 'com.custom.TrustManager',
+        implements: [Java.use('javax.net.ssl.X509TrustManager')],
+        methods: {
+            checkClientTrusted: function(chain, authType) {},
+            checkServerTrusted: function(chain, authType) {},
+            getAcceptedIssuers: function() { return []; }
+        }
+    });
+});
+```
+
+#### b) Objection (Tool)
+```bash
+objection -g com.target.app explore
+android sslpinning disable
+```
+
+#### c) Network Security Config Bypass
+```xml
+<!-- AndroidManifest.xml -->
+<network-security-config>
+    <domain-config>
+        <domain includeSubdomains="true">target.com</domain>
+        <pin-set>
+            <pin digest="SHA-256">base64==</pin>
+        </pin-set>
+    </domain-config>
+</network-security-config>
+```
+
+#### d) Reverse Engineering Patching
+Patch network library (OkHttp, gRPC) untuk bypass pin validation
+
+---
+
+## 23. Signature
+
+### Definisi
+Signature adalah identifikasi unik binary berdasarkan hash atau pattern tertentu.
+
+### Jenis-jenis Signature
+
+#### a) File Signature (Magic Bytes)
+```
+PE:   4D 5A (MZ)
+ELF:  7F 45 4C 46
+ZIP:  50 4B 03 04
+PNG:  89 50 4E 47
+```
+
+#### b) Compiler/Library Signature
+```python
+strings_indicators = {
+    "Microsoft Visual C++": "Microsoft Visual C",
+    "GCC": "GCC:",
+    "Go": "go.buildid",
+    "Rust": ".rustc",
+    ".NET": "mscoree.dll",
+    "Unity": "Unity Engine",
+}
+```
+
+#### c) Code Signature (Function Hash)
+```python
+# IDA FLIRT signature
+# Membuat signature dari fungsi untuk identifikasi library
+```
+
+#### d) Malware Signature
+```yara
+rule Suspicious_Pattern {
+    strings:
+        $s1 = "CreateRemoteThread" ascii
+        $s2 = "VirtualAllocEx" ascii
+    condition:
+        all of them
+}
+```
+
+---
+
+## 24. Deobfuscation
+
+### Definisi
+Deobfuscation adalah proses mengembalikan kode yang telah di-obfuscate (dibuat sulit dibaca) menjadi kode yang lebih readable dan dapat dipahami.
+
+### Segmentasi Deobfuscation
+
+#### A. Control Flow Deobfuscation
+Mengembalikan alur kontrol yang telah dirusak:
+```
+Obfuscated:
+  if (a > b) goto label_x;
+  goto label_y;
+  label_x: ...
+  label_y: ...
+
+Deobfuscated:
+  if (a > b) {
+      // do something
+  } else {
+      // do something else
+  }
+```
+
+**Metode:**
+- **Control Flow Graph (CFG) recovery:** Membangun ulang graph alur kontrol
+- **Dominator tree analysis:** Menentukan hierarki blok kode
+- **Pattern matching:** Identifikasi pola obfuscation
+
+#### B. Data Flow Deobfuscation
+Mengembalikan aliran data yang telah di-obfuscate:
+```
+Obfuscated:
+  x = a ^ 0x42;
+  y = x ^ 0x42;
+  // y == a
+
+Deobfuscated:
+  y = a;  // constant folding
+```
+
+**Metode:**
+- **Constant propagation:** Ganti variable dengan nilainya
+- **Constant folding:** Hitung konstanta di compile time
+- **Dead code elimination:** Hapus kode yang tidak berpengaruh
+
+#### C. String Deobfuscation
+Mengembalikan string yang telah di-encrypt/encoded:
+```
+Obfuscated:
+  key = 0x5A;
+  enc = "Hello" → XOR each byte with key
+  runtime: decrypt(enc, key) → "Hello"
+
+Deobfuscated:
+  replace_all(calls_to_decrypt, "Hello")
+```
+
+**Metode:**
+- **Static analysis:** Trace decryption function, extract key
+- **Dynamic analysis:** Hook decryption function di runtime
+- **Emulation:** Jalankan decryption routine di emulator
+- **Pattern recognition:** Identifikasi XOR/AES/ROT13 patterns
+
+#### D. Virtualization Deobfuscation
+Mengembalikan kode yang dijalankan di VM custom:
+```
+Obfuscated:
+  VM opcode 0x01 → push imm
+  VM opcode 0x02 → pop reg
+  VM opcode 0x03 → add reg, reg
+  VM opcode 0xFF → exit VM
+
+Deobfuscated:
+  a = 5;
+  b = 3;
+  c = a + b;
+```
+
+**Metode:**
+- **VM opcode recovery:** Identifikasi setiap opcode
+- **Handler analysis:** Analisis fungsi handler untuk setiap opcode
+- **IR reconstruction:** Bangun IR dari VM execution
+
+### Metode Deobfuscation
+
+| Metode | Tipe | Kelebihan | Kekurangan |
+|--------|------|-----------|------------|
+| **Static Analysis** | Tanpa runtime | Cepat, bisa batch | Tidak handle runtime-only obfuscation |
+| **Dynamic Analysis** | Runtime | Handle semua tipe | Lambat, perlu environment |
+| **Symbolic Execution** | Hybrid | Handle complex branching | Resource intensive |
+| **AI/ML-based** | Hybrid | Handle pattern baru | Butuh training data |
+| **Emulation** | Static | Handle packing | Lambat untuk binary besar |
+
+---
+
+## 25. Hooking
+
+### Definisi
+Hooking adalah teknik untuk intercept/memodifikasi perilaku fungsi pada runtime tanpa mengubah kode sumber.
+
+### Segmentasi Hooking
+
+#### A. User-Mode Hooking
+Berjalan di level aplikasi (ring 3):
+```
+User Space:
+  App Function → Hook → Original Function
+  (intercepted) (modified behavior)
+```
+
+#### B. Kernel-Mode Hooking
+Berjalan di level kernel (ring 0):
+```
+Kernel Space:
+  Syscall → Hook → Original Handler
+  (intercepted) (modified behavior)
+```
+
+### Metode Hooking
+
+#### 1. Import Address Table (IAT) Hooking
+**Cara kerja:** Mengubah pointer di Import Address Table untuk mengarah ke hook function.
+
+```
+Original IAT:
+  MessageBoxA → user32.dll!MessageBoxA
+
+Hooked IAT:
+  MessageBoxA → MyHook!MyMessageBox
+```
+
+**Contoh Implementasi (Windows):**
+```c
+HMODULE hModule = GetModuleHandle(NULL);
+PIMAGE_IMPORT_DESCRIPTOR importDesc = 
+    (PIMAGE_IMPORT_DESCRIPTOR)ImageDirectoryEntryToData(
+        hModule, TRUE, 
+        IMAGE_DIRECTORY_ENTRY_IMPORT, &size);
+
+while (importDesc->Name) {
+    PIMAGE_THUNK_DATA thunk = 
+        (PIMAGE_THUNK_DATA)((BYTE*)hModule + 
+        importDesc->FirstThunk);
+    
+    while (thunk->u1.AddressOfData) {
+        if (strcmp(((PIMAGE_IMPORT_BY_NAME)
+            thunk->u1.AddressOfData)->Name, 
+            "MessageBoxA") == 0) {
+            thunk->u1.Function = (DWORD_PTR)MyHook;
+        }
+        thunk++;
+    }
+    importDesc++;
+}
+```
+
+#### 2. Inline/Detour Hooking
+**Cara kerja:** Menulis instruction JMP ke hook function di awal fungsi target.
+
+```
+Original (target function):
+  push ebp
+  mov ebp, esp
+  ... (code)
+
+Patched:
+  jmp MyHook          ← 5 bytes (E9 XX XX XX XX)
+  mov ebp, esp        ← overwritten
+  ... (code)
+```
+
+**Trampoline Pattern:**
+```
+Original Function:
+  push ebp         ← overwritten by JMP
+  mov ebp, esp
+  ...
+
+Trampoline (holds original bytes + JMP back):
+  push ebp         ← original bytes
+  mov ebp, esp     ← original bytes
+  jmp original+5   ← continue original code
+```
+
+**Implementasi (Linux):**
+```c
+#include <sys/mman.h>
+
+void hook_function(void *target, void *hook, void **trampoline) {
+    *trampoline = mmap(NULL, 12, PROT_READ | PROT_WRITE | PROT_EXEC,
+                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    memcpy(*trampoline, target, 5);
+    *(BYTE*)((BYTE*)*trampoline + 5) = 0xE9;
+    *(DWORD*)((BYTE*)*trampoline + 6) = 
+        (DWORD)((BYTE*)target + 5) - (DWORD)((BYTE*)*trampoline + 10);
+    mprotect(target, 4096, PROT_READ | PROT_WRITE | PROT_EXEC);
+    *(BYTE*)target = 0xE9;
+    *(DWORD*)((BYTE*)target + 1) = 
+        (DWORD)hook - (DWORD)target - 5;
+}
+```
+
+#### 3. VTable Hooking
+**Cara kerja:** Mengubah virtual function pointer di vtable objek C++.
+
+```
+VTable (Array of function pointers):
+  Index 0: → Func_A
+  Index 1: → Func_B  ← hooked
+  Index 2: → Func_C
+
+Hooked VTable:
+  Index 0: → Func_A
+  Index 1: → MyHook_B  ← replaced
+  Index 2: → Func_C
+```
+
+**Contoh:**
+```cpp
+class Target {
+    virtual void Func_A();
+    virtual void Func_B(); // target
+    virtual void Func_C();
+};
+
+void MyHook_B() {
+    // pre-processing
+    originalFunc(); // call original
+    // post-processing
+}
+
+DWORD_PTR* vtable = *(DWORD_PTR**)targetObject;
+DWORD_PTR originalFunc = vtable[1];
+vtable[1] = (DWORD_PTR)MyHook_B;
+```
+
+#### 4. PLT/GOT Hooking (Linux)
+**Cara kerja:** Mengubah pointer di Global Offset Table (GOT) untuk shared library calls.
+
+```
+PLT (Procedure Linkage Table):
+  call printf@plt
+    → jmp *GOT[printf]  ← GOT entry
+
+GOT (Global Offset Table):
+  GOT[printf] → libc!printf  ← original
+  GOT[printf] → MyPrintf     ← hooked
+```
+
+#### 5. Function Pointer Hooking
+**Cara kerja:** Mengganti pointer fungsi secara langsung (untuk fungsi non-virtual).
+
+```c
+typedef int (*OriginalFunc)(int, int);
+OriginalFunc originalFunc = NULL;
+
+int HookedFunc(int a, int b) {
+    printf("Intercepted: %d, %d\n", a, b);
+    return originalFunc(a, b);
+}
+
+void InstallHook() {
+    originalFunc = targetFunc;
+    targetFunc = HookedFunc;
+}
+```
+
+#### 6. Inline Trampoline (Advanced)
+**Cara kerja:** Lebih canggih dari detour — handle absolute jumps dan wide instructions.
+
+```
+Target (x86-64):
+  mov rax, [rbp+0x10]  ← 7 bytes
+  add rax, rbx         ← 3 bytes
+  
+Patched:
+  jmp short MyHook     ← 2 bytes (EB XX)
+  nop                  ← 1 byte
+  add rax, rbx         ← overwritten
+  
+Trampoline:
+  mov rax, [rbp+0x10]  ← saved original
+  jmp target+3         ← continue
+```
+
+#### 7. IAT Hooking Framework (Open Source)
+```c
+#include <MinHook.h>
+
+int WINAPI My_MessageBoxW(HWND hWnd, LPCWSTR lpText, 
+                          LPCWSTR lpCaption, UINT uType) {
+    return MessageBoxW(hWnd, L"Patched!", lpCaption, uType);
+}
+
+MH_STATUS status = MH_Initialize();
+status = MH_CreateHook(&MessageBoxW, &My_MessageBoxW, 
+                       (LPVOID*)&Original_MessageBoxW);
+status = MH_EnableHook(&MessageBoxW);
+```
+
+### Perbandingan Metode Hooking
+
+| Metode | Level | Stealth | Kompatibilitas | Kompleksitas |
+|--------|-------|---------|----------------|--------------|
+| IAT Hooking | User | Medium | Terbatas (import) | Rendah |
+| Inline/Detour | User | Rendah (deteksi) | Tinggi | Sedang |
+| VTable Hooking | User | Medium | C++ virtual only | Sedang |
+| PLT/GOT | User | Medium | Shared lib | Sedang |
+| Inline Trampoline | User | Tinggi | Tinggi | Tinggi |
+| Kernel Hooking | Kernel | Tinggi | Perlu driver | Sangat Tinggi |
+
+---
+
+## 26. Kesimpulan
 
 ### Ringkasan Konsep
 
@@ -529,6 +1359,22 @@ Secara garis besar ada 5 kategori utama metadata Android:
 | Sanitizer | Deteksi runtime buffer overflow, UAF, dll |
 | Heap Allocator | Memahami exploitation primitive di heap |
 | Metadata (IL2CPP) | Memahami symbolic info di Unity/game binaries |
+| Recursive Binary Unpacker | Membongkar binary bertingkat sampai original |
+| Section Carver | Mengekstrak section spesifik dari binary PE/ELF |
+| Entropy | Mendeteksi encryption/compression via randomitas data |
+| IR (Intermediate Representation) | Bahasa perantara untuk decompiler/compiler |
+| Stacktrace | Rekaman urutan fungsi untuk crash analysis |
+| Patching | Mengubah binary untuk modifikasi perilaku |
+| Compiler | Pipeline source code → machine code |
+| Packer | Tool proteksi binary dari analisis |
+| Root Checker | Mendeteksi perangkat Android yang di-root |
+| Anti Debug | Mendeteksi/mencegah debugger terhubung |
+| Anti Cheat | Mencegah kecurangan dalam game online |
+| Play Integrity Check | Verifikasi integritas perangkat Android |
+| SSL Unpinning | Bypass certificate pinning untuk analisis traffic |
+| Signature | Identifikasi unik binary berdasarkan pattern |
+| Deobfuscation | Mengembalikan kode yang di-obfuscate |
+| Hooking | Intercept/modifikasi fungsi pada runtime |
 
 ### Keterkaitan Antar Konsep
 
@@ -542,16 +1388,101 @@ Semua konsep ini saling terkait dalam workflow reverse engineering:
 6. **Pointer Coverage** dan **Sanitizer** membantu mendeteksi vulnerability
 7. **Heap Allocator** memahami primitive untuk exploitation
 8. **Metadata** memberikan symbolic information untuk analisis game/mobile binaries
+9. **Entropy** membantu mendeteksi packed/encrypted binary
+10. **Recursive Binary Unpacker** membongkar binary bertingkat
+11. **Section Carver** mengekstrak bagian spesifik untuk analisis
+12. **IR** menjadi jembatan antara machine code dan pseudocode
+13. **Compiler** memahami optimasi yang mempengaruhi kode
+14. **Packer** memahami proteksi yang perlu dibypass
+15. **Stacktrace** membantu crash analysis dan debugging
+16. **Patching** memodifikasi binary untuk analisis/modifikasi
+17. **Root Checker** memahami deteksi root di Android
+18. **Anti Debug** memahami pertahanan terhadap debugger
+19. **Anti Cheat** memahami sistem keamanan game
+20. **Play Integrity Check** verifikasi integritas perangkat
+21. **SSL Unpinning** memungkinkan analisis traffic network
+22. **Signature** identifikasi binary dan library
+23. **Deobfuscation** mengembalikan kode yang sulit dibaca
+24. **Hooking** memodifikasi perilaku program secara dinamis
+
+### Workflow Reverse Engineering Lengkap
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    WORKFLOW REVERSE ENGINEERING                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. RECONNAISSANCE                                              │
+│     ├── File Signature → Identifikasi format binary             │
+│     ├── Entropy Analysis → Deteksi packing/encryption           │
+│     └── Section Carver → Ekstrak section untuk analisis         │
+│                                                                 │
+│  2. STATIC ANALYSIS                                             │
+│     ├── Recursive Binary Unpacker → Buang packing layers        │
+│     ├── IR (Ghidra/IDA) → Bangun intermediate representation   │
+│     ├── Expression Synthesis → Simplifikasi kode kompleks       │
+│     └── Compiler Analysis → Pahami optimasi compiler            │
+│                                                                 │
+│  3. DYNAMIC ANALYSIS                                            │
+│     ├── Anti Debug Bypass → lumpuhkan pertahanan debugger       │
+│     ├── Hooking → Intercept fungsi untuk monitoring             │
+│     ├── SSL Unpinning → Analisis traffic network                │
+│     └── Root Checker Bypass → Akses root detection              │
+│                                                                 │
+│  4. DEOBFUSCATION                                               │
+│     ├── Control Flow Recovery → Perbaiki alur kontrol           │
+│     ├── Data Flow Analysis → Simplifikasi data propagation      │
+│     ├── String Deobfuscation → Decrypt strings tersembunyi      │
+│     └── VM Deobfuscation → Reverse virtualization               │
+│                                                                 │
+│  5. VULNERABILITY ANALYSIS                                      │
+│     ├── Taint Analysis → Track data dari source ke sink         │
+│     ├── Pointer Coverage → Deteksi memory corruption            │
+│     ├── Sanitizer Analysis → Identifikasi vulnerability         │
+│     └── Heap Analysis → Pahami exploitation primitive           │
+│                                                                 │
+│  6. EXPLOITATION / MODIFICATION                                 │
+│     ├── Patching → Modifikasi binary                            │
+│     ├── Hooking → Runtime behavior modification                 │
+│     ├── Packer Bypass → Anti-protection techniques              │
+│     └── Anti Cheat Bypass → Game security circumvention         │
+│                                                                 │
+│  7. DOCUMENTATION                                               │
+│     ├── Metadata Analysis → Extract symbolic information        │
+│     ├── Stacktrace Analysis → Document crash behavior           │
+│     └── Play Integrity → Understand device attestation          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ### Relevansi untuk Pengembangan OmniByte
 
 Pemahaman terhadap konsep-konsep ini penting untuk:
-- Mengembangkan tools analisis binary yang efektif
-- Membangun fuzzer yang dapat menemukan vulnerability kompleks
-- Memahami teknik exploitation modern
-- Menganalisis binary tanpa source code
-- Membangun sistem pertahanan yang robust
-- Menganalisis game/mobile applications (Unity IL2CPP, Android APK)
+
+#### Analisis Binary
+- **Entropy & Signature** → Deteksi format dan proteksi binary
+- **Section Carver & Recursive Unpacker** → Ekstrak kode dari binary terproteksi
+- **IR & Compiler** → Memahami bagaimana kode dieksekusi
+
+#### Game Engine Analysis
+- **Metadata (IL2CPP)** → Extract type/method dari Unity games
+- **Hooking** → Intercept fungsi game untuk modifikasi
+- **Anti Cheat Bypass** → Memahami dan bypass proteksi game
+
+#### Security Research
+- **Deobfuscation** → Membongkar kode yang dilindungi
+- **Taint Analysis** → Menemukan vulnerability
+- **Patching** → Modifikasi perilaku program
+
+#### Android Security
+- **Root Checker** → Memahami deteksi root
+- **SSL Unpinning** → Analisis traffic aplikasi Android
+- **Play Integrity Check** → Verifikasi integritas perangkat
+
+#### Tools Development
+- **Hooking Framework** → Membangun tools analisis dinamis
+- **Stacktrace Analysis** → Debugging dan crash analysis
+- **Packer/Protector Analysis** → Reverse engineering proteksi
 
 ---
 
