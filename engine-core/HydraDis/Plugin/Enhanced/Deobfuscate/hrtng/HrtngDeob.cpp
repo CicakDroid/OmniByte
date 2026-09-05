@@ -117,7 +117,7 @@ std::vector<uint8_t> HrtngDecrypt::decodeBase64(const std::string& encoded) {
     return result;
 }
 
-std::string HrtngEncrypt::encodeBase64(const std::vector<uint8_t>& data) {
+std::string HrtngDecrypt::encodeBase64(const std::vector<uint8_t>& data) {
     static const std::string chars =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 

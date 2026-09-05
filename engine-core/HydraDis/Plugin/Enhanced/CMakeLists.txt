@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(AST)
 add_subdirectory(CFG)
+add_subdirectory(Deobfuscate)
 add_subdirectory(FunctionResolver)
 add_subdirectory(RTTI)
 add_subdirectory(Crypt)
