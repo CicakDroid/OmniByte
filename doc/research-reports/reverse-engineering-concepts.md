@@ -3,7 +3,7 @@
 **Nama Proyek:** Pengembangan OmniByte
 **Tanggal:** 2026-09-05 (Updated)
 **Status:** Final
-**Revisi:** 2.0 - Penambahan 16 konsep reverse engineering
+**Revisi:** 3.0 - Penambahan Anti-Tampering dan Magic Number (0xFAB11BAF)
 
 ---
 
@@ -34,7 +34,9 @@
 23. [Signature](#23-signature)
 24. [Deobfuscation](#24-deobfuscation)
 25. [Hooking](#25-hooking)
-26. [Kesimpulan](#26-kesimpulan)
+26. [Anti-Tampering](#26-anti-tampering)
+27. [Valid 0xFAB11BAF Magic Number](#27-valid-0xfab11baf-magic-number)
+28. [Kesimpulan](#28-kesimpulan)
 
 ---
 
@@ -1344,7 +1346,430 @@ status = MH_EnableHook(&MessageBoxW);
 
 ---
 
-## 26. Kesimpulan
+## 26. Anti-Tampering
+
+### Definisi
+Anti-tampering adalah mekanisme pertahanan yang mendeteksi dan mencegah modifikasi tidak sah terhadap binary, data, atau runtime state program. Berbeda dengan anti-debug (fokus pada debugger), anti-tampering berfokus pada integritas kode dan data program.
+
+### Segmentasi Anti-Tampering
+
+#### A. Code Integrity Check
+Memverifikasi bahwa kode program belum dimodifikasi:
+```
+Original Binary:
+  Code Section → CRC/Hash → Expected Value
+
+Runtime Check:
+  Calculate CRC/Hash → Compare with Expected
+  → Mismatch = TAMPERED
+```
+
+**Metode:**
+- **CRC32/Checksum:** Cepat, tapi rentan bypass
+- **SHA-256 Hash:** Lebih aman, tapi lebih lambat
+- **Section Hash:** Hash per section (.text, .rdata, .data)
+- **Code Patching Detection:** Cek instruksi tertentu (misal: NOP sled)
+
+#### B. Data Integrity Check
+Memverifikasi bahwa data runtime belum dimodifikasi:
+```
+Health: 100 (original)
+Modified: 9999 (cheated)
+
+Detection:
+  - Encrypted health value
+  - Checksummed data structure
+  - Obfuscated pointer access
+```
+
+**Metode:**
+- **Encrypted Variables:** Value di-encrypt dengan key dinamis
+- **Checksummed Structures:** Setiap field memiliki checksum
+- **Red Herring Variables:** Decoy values yang harus tetap sinkron
+- **Memory Encryption:** Data sensitif di-encrypt di memory
+
+#### C. Runtime State Validation
+Memverifikasi bahwa runtime state konsisten:
+```
+Expected: HP=100, Ammo=30, Score=5000
+Actual:   HP=100, Ammo=999, Score=999999
+→ Mismatch = TAMPERED
+```
+
+**Metode:**
+- **Cross-Validation:** Bandingkan nilai dari beberapa sumber
+- **Timing Check:** Deteksi modifikasi via timing analysis
+- **Behavior Analysis:** Deteksi anomali perilaku program
+- **Server Validation:** Verifikasi value di server side
+
+### Metode Implementasi
+
+#### 1. Inline Integrity Check
+```c
+// Simple integrity check
+void check_integrity() {
+    uint32_t expected = 0x12345678;
+    uint32_t actual = calculate_checksum(code_section);
+    if (actual != expected) {
+        // Tampering detected
+        exit(1);
+    }
+}
+```
+
+#### 2. Function Prologue Check
+```c
+// Check function prologue hasn't been modified
+void check_function(void *func) {
+    uint8_t *bytes = (uint8_t*)func;
+    if (bytes[0] != 0x55 || bytes[1] != 0x89 || bytes[2] != 0xE5) {
+        // Function has been hooked/modified
+        exit(1);
+    }
+}
+```
+
+#### 3. Self-Modifying Integrity
+```c
+// Dynamic integrity check that changes each run
+static uint32_t integrity_key = 0;
+void check_integrity() {
+    uint32_t key = generate_dynamic_key();
+    uint32_t checksum = calculate_checksum_with_key(key);
+    if (checksum != stored_checksum) {
+        exit(1);
+    }
+    integrity_key = key;
+}
+```
+
+#### 4. Hardware Breakpoint Detection
+```c
+// Detect hardware breakpoints (used for tampering)
+CONTEXT ctx;
+ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+GetThreadContext(GetCurrentThread(), &ctx);
+if (ctx.Dr0 || ctx.Dr1 || ctx.Dr2 || ctx.Dr3) {
+    // Hardware breakpoint = potential tampering
+    exit(1);
+}
+```
+
+#### 5. Return Address Integrity
+```c
+// Check return address hasn't been modified
+void check_return_address() {
+    void *ret_addr = __builtin_return_address(0);
+    if (!is_valid_address(ret_addr)) {
+        // Return address has been tampered
+        exit(1);
+    }
+}
+```
+
+### Anti-Tampering dalam Game Development
+
+| Aspek | Implementasi |
+|-------|--------------|
+| **Score Validation** | Server-side validation, encrypted score values |
+| **Health/Ammo** | Checksummed structures, red herring variables |
+| **Position** | Physics validation, movement speed checks |
+| **Unlockables** | Encrypted unlock flags, server validation |
+| **Purchases** | Receipt validation, server-side verification |
+
+### Bypass Techniques (untuk analisis)
+
+1. **NOP Patching:** Ganti check dengan NOP instructions
+2. **Jump Patching:** Skip integrity check function
+3. **Memory Patching:** Modifikasi checksum/expected value
+4. **Hooking:** Intercept check function, return always true
+5. **Dynamic Key Extraction:** Extract encryption key dari runtime
+
+---
+
+## 27. Valid 0xFAB11BAF Magic Number
+
+### Definisi
+`0xFAB11BAF` adalah magic number (signature) yang digunakan oleh Unity IL2CPP untuk memvalidasi file metadata (`globalmetadata.dat`). Magic number adalah byte sequence unik di awal file yang mengidentifikasi format file.
+
+### Struktur File Metadata Unity IL2CPP
+
+```
+globalmetadata.dat
+┌─────────────────────────────────────────────────┐
+│ Offset 0x00: Magic Number (4 bytes)             │
+│   Value: 0xFAB11BAF (little-endian: AF 1B AB FA)│
+├─────────────────────────────────────────────────┤
+│ Offset 0x04: Version Number (4 bytes)           │
+│   Value: 24, 27, 29, etc.                       │
+├─────────────────────────────────────────────────┤
+│ Offset 0x08: Size (4 bytes)                     │
+│   Value: Total file size                        │
+├─────────────────────────────────────────────────┤
+│ Offset 0x0C: String Literal Offset              │
+├─────────────────────────────────────────────────┤
+│ Offset 0x10: String Literal Count               │
+├─────────────────────────────────────────────────┤
+│ ... (more header fields)                        │
+├─────────────────────────────────────────────────┤
+│ Offset 0xNN: String Literal Data                │
+│   (actual string content)                       │
+├─────────────────────────────────────────────────┤
+│ Offset 0xMM: Type Definition Data               │
+├─────────────────────────────────────────────────┤
+│ Offset 0xKK: Method Definition Data             │
+├─────────────────────────────────────────────────┤
+│ Offset 0xLL: Field Definition Data              │
+└─────────────────────────────────────────────────┘
+```
+
+### Validasi Magic Number
+
+```cpp
+// Dari CodeGraph context - Validation::ValidateHeader
+bool ValidateHeader(const uint8_t* data, size_t size) {
+    if (size < 16) return false;
+    
+    // Check magic number
+    uint32_t magic = *reinterpret_cast<const uint32_t*>(data);
+    if (magic != 0xFAB11BAF) {
+        return false;  // Invalid magic
+    }
+    
+    // Check version
+    uint32_t version = *reinterpret_cast<const uint32_t*>(data + 4);
+    if (version < 1 || version > 29) {
+        return false;  // Invalid version
+    }
+    
+    // Check size
+    uint32_t file_size = *reinterpret_cast<const uint32_t*>(data + 8);
+    if (file_size != size) {
+        return false;  // Size mismatch
+    }
+    
+    return true;
+}
+```
+
+### Segmentasi Magic Number
+
+#### A. Magic Byte Analysis
+```
+0xFAB11BAF dalam berbagai representasi:
+
+Hex:        FA B1 1B AF
+Binary:     1111 1010 1011 0001 0001 1011 1010 1111
+Decimal:    4205701551
+Little-endian: AF 1B AB FA (di file)
+Big-endian:    FA B1 1B AF (di memory)
+```
+
+#### B. Magic Validation Flow
+```
+┌─────────────────────────────────────────────────────┐
+│                 MAGIC VALIDATION FLOW               │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  1. READ FIRST 4 BYTES                              │
+│     ↓                                               │
+│  2. COMPARE WITH 0xFAB11BAF                         │
+│     ├── Match → Continue to version check           │
+│     └── No Match → REJECT (not IL2CPP metadata)    │
+│                                                     │
+│  3. READ NEXT 4 BYTES (version)                     │
+│     ↓                                               │
+│  4. VALIDATE VERSION RANGE                          │
+│     ├── v24 (Unity 5.x - 2017)                     │
+│     ├── v27 (Unity 2018 - 2019)                     │
+│     ├── v29 (Unity 2020+)                           │
+│     └── Invalid → REJECT                            │
+│                                                     │
+│  5. READ SIZE FIELD                                 │
+│     ↓                                               │
+│  6. VALIDATE FILE SIZE                              │
+│     ├── Match actual size → VALID                   │
+│     └── Mismatch → REJECT (corrupted)              │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+#### C. Version-Specific Magic
+```
+Unity IL2CPP Metadata Versions:
+
+Version 14 (Unity 5.x):
+  Magic: 0xFAB11BAF
+  Features: Basic metadata
+
+Version 19 (Unity 2017.1):
+  Magic: 0xFAB11BAF
+  Features: Added generic parameters
+
+Version 21 (Unity 2017.3):
+  Magic: 0xFAB11BAF
+  Features: Added method body offsets
+
+Version 22 (Unity 2018.1):
+  Magic: 0xFAB11BAF
+  Features: Added debug data
+
+Version 24 (Unity 2018.3):
+  Magic: 0xFAB11BAF
+  Features: Added generic method specs
+
+Version 27 (Unity 2020.2):
+  Magic: 0xFAB11BAF
+  Features: Added resource data
+
+Version 29 (Unity 2021.2+):
+  Magic: 0xFAB11BAF
+  Features: Added assembly reload data
+```
+
+### Metode Analisis Magic Number
+
+#### 1. File Signature Scanning
+```python
+# Scan untuk magic bytes di binary
+MAGIC_IL2CPP = b'\xAF\x1B\xAB\xFA'  # 0xFAB11BAF little-endian
+
+def find_il2cpp_metadata(data):
+    offset = 0
+    while True:
+        pos = data.find(MAGIC_IL2CPP, offset)
+        if pos == -1:
+            break
+        print(f"Found IL2CPP metadata at offset: 0x{pos:X}")
+        offset = pos + 4
+```
+
+#### 2. Header Parsing
+```python
+import struct
+
+def parse_metadata_header(data):
+    magic = struct.unpack('<I', data[0:4])[0]
+    version = struct.unpack('<I', data[4:8])[0]
+    size = struct.unpack('<I', data[8:12])[0]
+    
+    if magic != 0xFAB11BAF:
+        raise ValueError("Invalid magic number")
+    
+    return {
+        'magic': hex(magic),
+        'version': version,
+        'size': size
+    }
+```
+
+#### 3. Cross-Reference Validation
+```cpp
+// Validate multiple sections
+bool validate_metadata(const uint8_t* data, size_t size) {
+    // 1. Check magic
+    if (*(uint32_t*)data != 0xFAB11BAF) return false;
+    
+    // 2. Check version
+    uint32_t version = *(uint32_t*)(data + 4);
+    if (!is_valid_version(version)) return false;
+    
+    // 3. Check string table offset
+    uint32_t string_offset = *(uint32_t*)(data + 0x10);
+    if (string_offset >= size) return false;
+    
+    // 4. Check type definition offset
+    uint32_t type_offset = *(uint32_t*)(data + 0x18);
+    if (type_offset >= size) return false;
+    
+    return true;
+}
+```
+
+### Valid Magic Number Lainnya (Game Engines)
+
+| Magic Value | Format | Engine/System |
+|-------------|--------|---------------|
+| `0xFAB11BAF` | IL2CPP Metadata | Unity IL2CPP |
+| `0xFAB11DAF` | IL2CPP Metadata (v27+) | Unity 2020+ |
+| `0x5A4F4F43` ("COOZ") | GameMaker data.win | GameMaker Studio |
+| `0x474D5300` ("MSG\x00") | Source 2 VPK | Valve Source 2 |
+| `0x05014B50` | ZIP/CraftStudio | CraftStudio |
+| `0x416E6472` ("Andr") | Android APK | Android Package |
+| `0x504B0304` | ZIP Format | JAR/APK/AAB |
+| `0x7F454C46` ("\x7fELF") | ELF Binary | Linux/Android |
+| `0x4D5A9000` ("MZ\x90\x00") | PE Binary | Windows DLL/EXE |
+
+### Magic Number dalam Konteks Keamanan
+
+#### 1. Anti-Tampering via Magic
+```cpp
+// Validate magic sebelum execute
+bool validate_before_execute() {
+    uint32_t magic = read_metadata_magic();
+    if (magic != EXPECTED_MAGIC) {
+        // Metadata telah dimodifikasi
+        log_security_event("TAMPER_DETECTED");
+        terminate_process();
+    }
+    return true;
+}
+```
+
+#### 2. Encrypted Magic
+```cpp
+// Magic di-encrypt untuk mencegah patching
+uint32_t get_encrypted_magic() {
+    uint32_t encrypted = read_from_file();
+    uint32_t key = generate_runtime_key();
+    return encrypted ^ key;  // Decrypt magic
+}
+```
+
+#### 3. Dynamic Magic
+```cpp
+// Magic berubah setiap build
+uint32_t calculate_dynamic_magic(uint32_t build_number) {
+    return 0xFAB11BAF ^ (build_number * 0x12345678);
+}
+```
+
+### Tools untuk Analisis Magic
+
+| Tool | Fungsi |
+|------|--------|
+| **Il2CppDumper** | Parse metadata dengan magic validation |
+| **File** (Linux) | Identifikasi file type via magic |
+| **binwalk** | Scan magic bytes di binary |
+| **hexdump** | Visual inspection magic bytes |
+| **010 Editor** | Template-based magic analysis |
+
+### Troubleshooting Magic Validation
+
+```
+Common Errors:
+
+1. "Invalid magic number"
+   → File bukan IL2CPP metadata
+   → File corrupted
+   → File di-encrypt (perlu decrypt dulu)
+
+2. "Invalid version"
+   → Versi metadata tidak didukung
+   → Perlu update parser untuk versi baru
+
+3. "Size mismatch"
+   → File terpotong (incomplete)
+   → Header corrupted
+
+4. "Offset out of bounds"
+   → Metadata corrupted
+   → Pointer manipulation detected
+```
+
+---
+
+## 28. Kesimpulan
 
 ### Ringkasan Konsep
 
@@ -1375,6 +1800,8 @@ status = MH_EnableHook(&MessageBoxW);
 | Signature | Identifikasi unik binary berdasarkan pattern |
 | Deobfuscation | Mengembalikan kode yang di-obfuscate |
 | Hooking | Intercept/modifikasi fungsi pada runtime |
+| Anti-Tampering | Mendeteksi/mencegah modifikasi tidak sah |
+| Magic Number (0xFAB11BAF) | Validasi format file Unity IL2CPP |
 
 ### Keterkaitan Antar Konsep
 
@@ -1404,6 +1831,8 @@ Semua konsep ini saling terkait dalam workflow reverse engineering:
 22. **Signature** identifikasi binary dan library
 23. **Deobfuscation** mengembalikan kode yang sulit dibaca
 24. **Hooking** memodifikasi perilaku program secara dinamis
+25. **Anti-Tampering** memahami pertahanan integritas kode
+26. **Magic Number** identifikasi format file dan validasi
 
 ### Workflow Reverse Engineering Lengkap
 
@@ -1414,6 +1843,7 @@ Semua konsep ini saling terkait dalam workflow reverse engineering:
 │                                                                 │
 │  1. RECONNAISSANCE                                              │
 │     ├── File Signature → Identifikasi format binary             │
+│     ├── Magic Number Validation → Verifikasi format file        │
 │     ├── Entropy Analysis → Deteksi packing/encryption           │
 │     └── Section Carver → Ekstrak section untuk analisis         │
 │                                                                 │
@@ -1444,6 +1874,7 @@ Semua konsep ini saling terkait dalam workflow reverse engineering:
 │  6. EXPLOITATION / MODIFICATION                                 │
 │     ├── Patching → Modifikasi binary                            │
 │     ├── Hooking → Runtime behavior modification                 │
+│     ├── Anti-Tampering Bypass → Circumvent integrity checks     │
 │     ├── Packer Bypass → Anti-protection techniques              │
 │     └── Anti Cheat Bypass → Game security circumvention         │
 │                                                                 │
@@ -1461,18 +1892,22 @@ Pemahaman terhadap konsep-konsep ini penting untuk:
 
 #### Analisis Binary
 - **Entropy & Signature** → Deteksi format dan proteksi binary
+- **Magic Number (0xFAB11BAF)** → Validasi format file IL2CPP
 - **Section Carver & Recursive Unpacker** → Ekstrak kode dari binary terproteksi
 - **IR & Compiler** → Memahami bagaimana kode dieksekusi
 
 #### Game Engine Analysis
 - **Metadata (IL2CPP)** → Extract type/method dari Unity games
+- **Magic Number Validation** → Verifikasi dan parse metadata files
 - **Hooking** → Intercept fungsi game untuk modifikasi
+- **Anti-Tampering** → Memahami pertahanan integritas game
 - **Anti Cheat Bypass** → Memahami dan bypass proteksi game
 
 #### Security Research
 - **Deobfuscation** → Membongkar kode yang dilindungi
 - **Taint Analysis** → Menemukan vulnerability
 - **Patching** → Modifikasi perilaku program
+- **Anti-Tampering Bypass** → Circumvent integrity checks
 
 #### Android Security
 - **Root Checker** → Memahami deteksi root
