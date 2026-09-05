@@ -13,6 +13,9 @@ add_subdirectory(DumperCore)
 add_subdirectory(Engines)
 add_subdirectory(Export)
 
+# Link shared metadata interface
+target_link_libraries(dumper PUBLIC shared)
+
 # ---------------------------------------------------------------------------
 # Real wiring (uncomment as sub-libraries become available):
 #

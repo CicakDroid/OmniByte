@@ -43,4 +43,5 @@ target_link_libraries(omnibyte
         engine_core
         runtime
         dumper
+        shared
 )

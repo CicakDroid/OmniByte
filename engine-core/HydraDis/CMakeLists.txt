@@ -12,3 +12,6 @@ add_subdirectory(Parser)
 add_subdirectory(Plugin)
 add_subdirectory(Factory)
 add_subdirectory(Orchestrator)
+
+# Link shared metadata interface
+target_link_libraries(hydradis PUBLIC shared)

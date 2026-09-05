@@ -4,6 +4,11 @@
 #include <cstdint>
 #include <optional>
 #include <unordered_map>
+#include <memory>
+
+// Include shared metadata types for full definitions
+#include "../../../engine-core/Shared/MetadataEntry.h"
+#include "../../../engine-core/Shared/IMetadataStore.h"
 
 namespace omnibyte::dumper {
 
@@ -69,6 +74,10 @@ struct DumpResult {
     // tipe-tipe generik di atas (mis. UE: GNames chunk, Godot: PCK entries).
     std::unordered_map<std::string, std::string> metadata;
 
+    // === Shared metadata store (opsional) ===
+    // Untuk integrasi dengan HydraDis melalui Shared Metadata Interface.
+    std::shared_ptr<omnibyte::shared::IMetadataStore> sharedStore;
+
     // === Error info ===
     std::string errorMessage;           // kosong jika success == true
 
@@ -80,6 +89,21 @@ struct DumpResult {
     std::optional<std::string> getMeta(const std::string& key) const {
         auto it = metadata.find(key);
         if (it != metadata.end()) return it->second;
+        return std::nullopt;
+    }
+
+    // Helper: tambah metadata ke shared store
+    void setSharedMeta(const std::string& key, const std::string& value,
+                       omnibyte::shared::MetadataSource source = omnibyte::shared::MetadataSource::DumperEngine) {
+        if (sharedStore) {
+            sharedStore->set(key, value, source, engineName);
+        }
+    }
+
+    std::optional<std::string> getSharedMeta(const std::string& key) const {
+        if (sharedStore) {
+            return sharedStore->getValue(key);
+        }
         return std::nullopt;
     }
 };

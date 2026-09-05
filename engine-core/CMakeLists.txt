@@ -10,6 +10,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(engine_core STATIC engine_core.cpp)
 
 add_subdirectory(HydraDis)
+add_subdirectory(Shared)
+
+# Link shared to engine_core
+target_link_libraries(engine_core PUBLIC shared)
 
 # ---------------------------------------------------------------------------
 # Real backend wiring (uncomment as each backend becomes available):

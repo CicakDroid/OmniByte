@@ -29,6 +29,11 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <optional>
+
+// Include shared metadata types for full definitions
+#include "../../Shared/MetadataEntry.h"
+#include "../../Shared/IMetadataStore.h"
 
 // Include kontrak HydraDis — dibutuhkan oleh convenience accessors di PluginContext
 // yang perlu akses member ParsedBinary, DisassemblyResult, DecompiledFunction.
@@ -128,6 +133,24 @@ struct PluginResult {
 
     // Structured output (opsional) — untuk plugin yang mau return metadata
     std::unordered_map<std::string, std::string> metadata;
+
+    // Shared metadata store (opsional) — untuk integrasi dengan Dumper
+    std::shared_ptr<omnibyte::shared::IMetadataStore> sharedStore;
+
+    // Helper: tambah metadata ke shared store
+    void setSharedMeta(const std::string& key, const std::string& value,
+                       omnibyte::shared::MetadataSource source = omnibyte::shared::MetadataSource::HydraDisPlugin) {
+        if (sharedStore) {
+            sharedStore->set(key, value, source, "HydraDis");
+        }
+    }
+
+    std::optional<std::string> getSharedMeta(const std::string& key) const {
+        if (sharedStore) {
+            return sharedStore->getValue(key);
+        }
+        return std::nullopt;
+    }
 };
 
 /// Kontrak dasar untuk semua HydraDis plugin.
