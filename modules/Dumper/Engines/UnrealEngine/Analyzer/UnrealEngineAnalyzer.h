@@ -15,9 +15,9 @@ namespace omnibyte::dumper::unrealengine {
 
 class UnrealEngineAnalyzer {
 public:
-    static DumpResult analyze(const AnalysisTarget& target,
+    static DumpData analyze(const AnalysisTarget& target,
                               const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "UnrealEngine";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -55,9 +55,9 @@ private:
     // offset 0x10: IndexSize (u32)
     // offset 0x14: IndexHash (20 bytes SHA1)
     // total: 44 bytes minimum
-    static DumpResult analyzePak(const std::vector<uint8_t>& data,
+    static DumpData analyzePak(const std::vector<uint8_t>& data,
                                   const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "UnrealEngine";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -83,7 +83,7 @@ private:
 
     // Parse .pak index table — extract file names as StringEntries
     static int parsePakIndex(const std::vector<uint8_t>& data, size_t indexStart,
-                              uint32_t indexSize, DumpResult& result) {
+                              uint32_t indexSize, DumpData& result) {
         size_t pos = indexStart;
         size_t indexEnd = indexStart + indexSize;
         int count = 0;
@@ -114,9 +114,9 @@ private:
     }
 
     // Scan binary for UE version strings ("UE4", "UE5")
-    static DumpResult analyzeBinary(const std::vector<uint8_t>& data,
+    static DumpData analyzeBinary(const std::vector<uint8_t>& data,
                                      const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "UnrealEngine";
         result.detectedVersion = profile ? profile->version() : "unknown";
 

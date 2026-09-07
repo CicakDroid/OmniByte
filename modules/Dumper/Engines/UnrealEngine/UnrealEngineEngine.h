@@ -43,13 +43,13 @@ public:
     }
 
     // Analyzer: baca GNames/GObjects table statis dari .pak / binary section
-    DumpResult analyze(const AnalysisTarget& target,
+    DumpData analyze(const AnalysisTarget& target,
                         const std::shared_ptr<IEngineProfile>& profile) override {
         return UnrealEngineAnalyzer::analyze(target, profile);
     }
 
     // Resolver: resolve GWorld/GObjects live via runtime/SymbolResolver (xDL) + MemoryIO
-    DumpResult resolveSymbols(const AnalysisTarget& target,
+    DumpData resolveSymbols(const AnalysisTarget& target,
                                const std::shared_ptr<IEngineProfile>& profile) override {
         return UnrealEngineResolver::resolveSymbols(target, profile);
     }

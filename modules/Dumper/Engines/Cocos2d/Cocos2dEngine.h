@@ -52,13 +52,13 @@ public:
     }
 
     // Analyzer: parse APK assets for Cocos2d detection signals (static, no live process)
-    DumpResult analyze(const AnalysisTarget& target,
+    DumpData analyze(const AnalysisTarget& target,
                         const std::shared_ptr<IEngineProfile>& profile) override {
         return Cocos2dAnalyzer::analyze(target, profile);
     }
 
     // Resolver: resolve engine symbols via live process (if needed)
-    DumpResult resolveSymbols(const AnalysisTarget& target,
+    DumpData resolveSymbols(const AnalysisTarget& target,
                                const std::shared_ptr<IEngineProfile>& profile) override {
         return Cocos2dResolver::resolveSymbols(target, profile);
     }

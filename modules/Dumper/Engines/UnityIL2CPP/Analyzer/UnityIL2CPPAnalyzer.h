@@ -15,9 +15,9 @@ namespace omnibyte::dumper::unityil2cpp {
 
 class UnityIL2CPPAnalyzer {
 public:
-    static DumpResult analyze(const AnalysisTarget& target,
+    static DumpData analyze(const AnalysisTarget& target,
                               const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "Unity IL2CPP";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -88,9 +88,9 @@ private:
     }
 
     // Parse the full IL2CPP metadata
-    static DumpResult parseMetadata(const std::vector<uint8_t>& data,
+    static DumpData parseMetadata(const std::vector<uint8_t>& data,
                                      const std::shared_ptr<IEngineProfile>& profile,
-                                     DumpResult& result) {
+                                     DumpData& result) {
         // IL2CPP metadata layout (version-dependent, offsets from profile):
         //   stringLiteralOffset, stringLiteralDataOffset
         //   typeDefinitionsOffset, typeDefinitionCount
@@ -160,7 +160,7 @@ private:
     // Parse Il2CppTypeDefinition array
     static void parseTypeDefinitions(const std::vector<uint8_t>& data,
                                       size_t offset, uint32_t count,
-                                      size_t structSize, DumpResult& result) {
+                                      size_t structSize, DumpData& result) {
         // Il2CppTypeDefinition fields (common across versions):
         //   +0x00: nameIndex (u32) — index into string heap
         //   +0x04: namespaceIndex (u32)
@@ -198,7 +198,7 @@ private:
     // Parse Il2CppMethodDefinition array
     static void parseMethodDefinitions(const std::vector<uint8_t>& data,
                                         size_t offset, uint32_t count,
-                                        size_t structSize, DumpResult& result) {
+                                        size_t structSize, DumpData& result) {
         for (uint32_t i = 0; i < count; ++i) {
             size_t entryOff = offset + (i * structSize);
             if (entryOff + structSize > data.size()) break;
@@ -218,7 +218,7 @@ private:
     // Parse Il2CppFieldDefinition array
     static void parseFieldDefinitions(const std::vector<uint8_t>& data,
                                        size_t offset, uint32_t count,
-                                       size_t structSize, DumpResult& result) {
+                                       size_t structSize, DumpData& result) {
         for (uint32_t i = 0; i < count; ++i) {
             size_t entryOff = offset + (i * structSize);
             if (entryOff + structSize > data.size()) break;
@@ -237,7 +237,7 @@ private:
     // Parse string literal table
     static void parseStringLiterals(const std::vector<uint8_t>& data,
                                      size_t tableOffset, size_t dataOffset,
-                                     DumpResult& result) {
+                                     DumpData& result) {
         // String literal table: count (u32) + entries (length u32 + data offset u32)
         if (tableOffset + 4 > data.size()) return;
 

@@ -45,12 +45,12 @@ public:
 
     // Analyzer: baca struktur metadata/header/global-table secara statis.
     // Tidak butuh proses live -- bisa jalan dari file saja.
-    virtual DumpResult analyze(const AnalysisTarget& target,
+    virtual DumpData analyze(const AnalysisTarget& target,
                                 const std::shared_ptr<IEngineProfile>& profile) = 0;
 
     // Resolver: resolve alamat symbol/type/method konkret.
     // Biasanya butuh live process (runtime/SymbolResolver + MemoryIO) untuk ASLR-safe address.
-    virtual DumpResult resolveSymbols(const AnalysisTarget& target,
+    virtual DumpData resolveSymbols(const AnalysisTarget& target,
                                        const std::shared_ptr<IEngineProfile>& profile) = 0;
 
     // Daftar versi SDK yang secara eksplisit didukung (punya Profile sendiri).

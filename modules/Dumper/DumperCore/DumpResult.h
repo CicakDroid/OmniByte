@@ -50,7 +50,7 @@ struct StringEntry {
     uint64_t address = 0;              // alamat di memori/file
 };
 
-// === DumpResult ===
+// === DumpData ===
 
 // Hasil dump dari satu engine. Engine::analyze() mengisi bagian statis
 // (typeTable, methodTable, fieldTable, strings), engine::resolveSymbols()
@@ -58,7 +58,7 @@ struct StringEntry {
 //
 // ExportCore membaca struct ini untuk menghasilkan output final
 // (CSharp headers, JSON, DummyDLL, dll).
-struct DumpResult {
+struct DumpData {
     bool success = false;
     std::string engineName;             // nama engine yang menghasilkan dump ini
     std::string detectedVersion;        // versi yang terdeteksi (mis. "27", "5.3")

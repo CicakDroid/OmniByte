@@ -15,9 +15,9 @@ namespace omnibyte::dumper::gamemaker {
 
 class GameMakerAnalyzer {
 public:
-    static DumpResult analyze(const AnalysisTarget& target,
+    static DumpData analyze(const AnalysisTarget& target,
                               const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "GameMaker";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -84,7 +84,7 @@ private:
     static const uint32_t kChunkFUNC = 0x434E5546;  // "FUNC"
 
     static void parseChunk(uint32_t name, const std::vector<uint8_t>& data,
-                            size_t offset, uint32_t size, DumpResult& result) {
+                            size_t offset, uint32_t size, DumpData& result) {
         if (name == kChunkGEN8) {
             parseGen8(data, offset, size, result);
         } else if (name == kChunkSTRG) {
@@ -99,7 +99,7 @@ private:
 
     // GEN8: Game metadata (version, filename, counts)
     static void parseGen8(const std::vector<uint8_t>& data, size_t offset,
-                           uint32_t size, DumpResult& result) {
+                           uint32_t size, DumpData& result) {
         if (size < 8) return;
 
         uint32_t gmVersion = readU32(data, offset);
@@ -118,7 +118,7 @@ private:
 
     // STRG: String table — count + entries (id u32, len u32, chars)
     static void parseStrg(const std::vector<uint8_t>& data, size_t offset,
-                           uint32_t size, DumpResult& result) {
+                           uint32_t size, DumpData& result) {
         if (size < 4) return;
 
         uint32_t count = readU32(data, offset);
@@ -147,7 +147,7 @@ private:
 
     // OBJT: Object definitions — count + entries (name, spriteId, visible, parentId)
     static void parseObjt(const std::vector<uint8_t>& data, size_t offset,
-                           uint32_t size, DumpResult& result) {
+                           uint32_t size, DumpData& result) {
         if (size < 4) return;
 
         uint32_t count = readU32(data, offset);
@@ -173,7 +173,7 @@ private:
 
     // FUNC: Function names + code offsets
     static void parseFunc(const std::vector<uint8_t>& data, size_t offset,
-                           uint32_t size, DumpResult& result) {
+                           uint32_t size, DumpData& result) {
         if (size < 4) return;
 
         uint32_t count = readU32(data, offset);

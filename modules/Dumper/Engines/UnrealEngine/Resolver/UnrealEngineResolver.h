@@ -15,9 +15,9 @@ namespace omnibyte::dumper::unrealengine {
 
 class UnrealEngineResolver {
 public:
-    static DumpResult resolveSymbols(const AnalysisTarget& target,
+    static DumpData resolveSymbols(const AnalysisTarget& target,
                                      const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "UnrealEngine";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -62,7 +62,7 @@ private:
 
     static void resolveGlobalPointers(const AnalysisTarget& target,
                                        const std::shared_ptr<IEngineProfile>& profile,
-                                       DumpResult& result) {
+                                       DumpData& result) {
         for (const char* key : kGlobalPatterns) {
             auto pattern = profile->patternFor(key);
             if (!pattern) continue;
@@ -88,7 +88,7 @@ private:
     // Walk GNames chunk table to resolve FName strings
     static void walkGNames(const AnalysisTarget& target,
                             const std::shared_ptr<IEngineProfile>& profile,
-                            DumpResult& result) {
+                            DumpData& result) {
         // GNames structure:
         //   GNames → ChunkTable (pointer array, typically 128K entries per chunk)
         //   Each chunk → FNameEntry[16384]
@@ -113,7 +113,7 @@ private:
     // Walk GObjects array to enumerate UObject instances
     static void walkGObjects(const AnalysisTarget& target,
                               const std::shared_ptr<IEngineProfile>& profile,
-                              DumpResult& result) {
+                              DumpData& result) {
         // GObjects structure:
         //   GObjects → FUObjectArray.Objects
         //   TUObjectArray[i] → UObject*

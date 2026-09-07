@@ -29,7 +29,7 @@ struct DumperResult {
     bool success = false;
     std::string errorMessage;
     WorkingModeResult workingModeResult;
-    std::vector<DumpResult> engineResults;
+    std::vector<DumpData> engineResults;
     std::string detectedEngine;
     double detectionConfidence = 0.0;
 };

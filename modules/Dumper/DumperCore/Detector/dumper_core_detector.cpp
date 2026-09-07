@@ -29,7 +29,7 @@ std::optional<DetectionOutcome> Detector::detect(const AnalysisTarget& target) {
     return outcome;
 }
 
-std::optional<DumpResult> Detector::detectAndAnalyze(const AnalysisTarget& target) {
+std::optional<DumpData> Detector::detectAndAnalyze(const AnalysisTarget& target) {
     auto outcome = detect(target);
     if (!outcome || !outcome->engine) {
         return std::nullopt;
@@ -38,7 +38,7 @@ std::optional<DumpResult> Detector::detectAndAnalyze(const AnalysisTarget& targe
     return outcome->engine->analyze(target, outcome->profile);
 }
 
-std::optional<DumpResult> Detector::detectAndResolve(const AnalysisTarget& target) {
+std::optional<DumpData> Detector::detectAndResolve(const AnalysisTarget& target) {
     auto outcome = detect(target);
     if (!outcome || !outcome->engine) {
         return std::nullopt;

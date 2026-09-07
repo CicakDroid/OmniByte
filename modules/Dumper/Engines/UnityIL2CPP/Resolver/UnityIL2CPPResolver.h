@@ -15,9 +15,9 @@ namespace omnibyte::dumper::unityil2cpp {
 
 class UnityIL2CPPResolver {
 public:
-    static DumpResult resolveSymbols(const AnalysisTarget& target,
+    static DumpData resolveSymbols(const AnalysisTarget& target,
                                      const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "Unity IL2CPP";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -79,7 +79,7 @@ private:
 
     static void resolveIL2CPPApiSymbols(const AnalysisTarget& target,
                                          const std::shared_ptr<IEngineProfile>& profile,
-                                         DumpResult& result) {
+                                         DumpData& result) {
         // Resolve class enumeration symbols
         for (const char* sym : kClassSymbols) {
             tryResolveSymbol(profile, sym, result);
@@ -103,7 +103,7 @@ private:
 
     static void resolveMetadataPointer(const AnalysisTarget& target,
                                         const std::shared_ptr<IEngineProfile>& profile,
-                                        DumpResult& result) {
+                                        DumpData& result) {
         // Try to resolve GlobalMetadataPointer via AOB pattern
         auto pattern = profile->patternFor("GlobalMetadataPointer");
         if (pattern) {
@@ -123,7 +123,7 @@ private:
 
     static void tryResolveSymbol(const std::shared_ptr<IEngineProfile>& profile,
                                   const std::string& key,
-                                  DumpResult& result) {
+                                  DumpData& result) {
         auto symName = profile->symbolFor(key);
         if (symName) {
             result.setMeta(key, *symName);

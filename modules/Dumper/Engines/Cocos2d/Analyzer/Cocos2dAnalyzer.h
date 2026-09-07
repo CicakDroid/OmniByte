@@ -14,9 +14,9 @@ namespace omnibyte::dumper::cocos2d {
 
 class Cocos2dAnalyzer {
 public:
-    static DumpResult analyze(const AnalysisTarget& target,
+    static DumpData analyze(const AnalysisTarget& target,
                               const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "Cocos2d";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -61,7 +61,7 @@ private:
         ".lua", ".luac", ".jsc", ".jsb", ".ts",
     };
 
-    static void scanLibraries(const std::vector<uint8_t>& data, DumpResult& result) {
+    static void scanLibraries(const std::vector<uint8_t>& data, DumpData& result) {
         int libCount = 0;
         std::string variant = "unknown";
 
@@ -86,7 +86,7 @@ private:
         result.setMeta("libraryCount", std::to_string(libCount));
     }
 
-    static void scanAssets(const std::vector<uint8_t>& data, DumpResult& result) {
+    static void scanAssets(const std::vector<uint8_t>& data, DumpData& result) {
         int scriptCount = 0;
 
         // Quick scan for script file extensions in the raw APK data
@@ -104,7 +104,7 @@ private:
         result.setMeta("scriptCount", std::to_string(scriptCount));
     }
 
-    static void scanDexPatterns(const std::vector<uint8_t>& data, DumpResult& result) {
+    static void scanDexPatterns(const std::vector<uint8_t>& data, DumpData& result) {
         // Look for org.cocos2dx package prefix in DEX strings
         std::string needle("org/cocos2dx");
         auto pos = utils::findCaseInsensitive(

@@ -41,13 +41,13 @@ public:
     }
 
     // Analyzer: parse .pck package statis (GDPC magic + file table)
-    DumpResult analyze(const AnalysisTarget& target,
+    DumpData analyze(const AnalysisTarget& target,
                         const std::shared_ptr<IEngineProfile>& profile) override {
         return GodotAnalyzer::analyze(target, profile);
     }
 
     // Resolver: resolve StringName::setup / ClassDB singleton via live process
-    DumpResult resolveSymbols(const AnalysisTarget& target,
+    DumpData resolveSymbols(const AnalysisTarget& target,
                                const std::shared_ptr<IEngineProfile>& profile) override {
         return GodotResolver::resolveSymbols(target, profile);
     }

@@ -43,14 +43,14 @@ public:
 
     // Analyzer: enumerasi MonoImage -> MonoClass -> MonoMethod dari
     // Assembly-CSharp.dll (statis, via IL parsing)
-    DumpResult analyze(const AnalysisTarget& target,
+    DumpData analyze(const AnalysisTarget& target,
                         const std::shared_ptr<IEngineProfile>& profile) override {
         return UnityMonoAnalyzer::analyze(target, profile);
     }
 
     // Resolver: resolve mono_get_root_domain & domain assemblies
     // via runtime/SymbolResolver (xDL)
-    DumpResult resolveSymbols(const AnalysisTarget& target,
+    DumpData resolveSymbols(const AnalysisTarget& target,
                                const std::shared_ptr<IEngineProfile>& profile) override {
         return UnityMonoResolver::resolveSymbols(target, profile);
     }

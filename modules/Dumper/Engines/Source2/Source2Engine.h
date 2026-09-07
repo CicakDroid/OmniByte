@@ -35,13 +35,13 @@ public:
     }
 
     // Analyzer: parse resource block header .vpk_c statis
-    DumpResult analyze(const AnalysisTarget& target,
+    DumpData analyze(const AnalysisTarget& target,
                         const std::shared_ptr<IEngineProfile>& profile) override {
         return Source2Analyzer::analyze(target, profile);
     }
 
     // Resolver: resolve symbol/address konkret (butuh live process)
-    DumpResult resolveSymbols(const AnalysisTarget& target,
+    DumpData resolveSymbols(const AnalysisTarget& target,
                                const std::shared_ptr<IEngineProfile>& profile) override {
         return Source2Resolver::resolveSymbols(target, profile);
     }

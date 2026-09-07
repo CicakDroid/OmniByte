@@ -15,9 +15,9 @@ namespace omnibyte::dumper::godot {
 
 class GodotAnalyzer {
 public:
-    static DumpResult analyze(const AnalysisTarget& target,
+    static DumpData analyze(const AnalysisTarget& target,
                               const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "Godot";
         result.detectedVersion = profile ? profile->version() : "unknown";
 

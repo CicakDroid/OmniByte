@@ -14,9 +14,9 @@ namespace omnibyte::dumper::gamemaker {
 
 class GameMakerResolver {
 public:
-    static DumpResult resolveSymbols(const AnalysisTarget& target,
+    static DumpData resolveSymbols(const AnalysisTarget& target,
                                      const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "GameMaker";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -44,7 +44,7 @@ public:
 private:
     static void resolveYoyorunSymbols(const AnalysisTarget& target,
                                        const std::shared_ptr<IEngineProfile>& profile,
-                                       DumpResult& result) {
+                                       DumpData& result) {
         // GameMaker runtime symbols
         static const char* kGMSymbols[] = {
             "yy_object_new",

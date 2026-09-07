@@ -11,10 +11,10 @@ class ResultNormalizer {
 public:
     // Merge multiple DumpResults into one canonical result.
     // If all fail, returns a failed result with combined error messages.
-    static DumpResult mergeResults(const std::vector<DumpResult>& results);
+    static DumpData mergeResults(const std::vector<DumpData>& results);
 
     // Merge two DumpResults.
-    static DumpResult mergeResults(const DumpResult& a, const DumpResult& b);
+    static DumpData mergeResults(const DumpData& a, const DumpData& b);
 
     // Deduplicate type entries by name — keep the one with more data.
     static std::vector<TypeEntry> normalizeTypes(const std::vector<TypeEntry>& types);

@@ -92,7 +92,7 @@ DumperResult DumperManager::execute(const AnalysisTarget& target) {
             
             // Execute engine analysis
             auto profile = matchResult->best->resolveProfile(matchResult->bestDetection.detectedVersion);
-            DumpResult engineResult = matchResult->best->analyze(fileTarget, profile);
+            DumpData engineResult = matchResult->best->analyze(fileTarget, profile);
             
             result.engineResults.push_back(engineResult);
             

@@ -43,7 +43,7 @@ public:
     }
 
     // Analyzer: baca global-metadata.dat pakai profile->offsetOf(...)
-    DumpResult analyze(const AnalysisTarget& target,
+    DumpData analyze(const AnalysisTarget& target,
                         const std::shared_ptr<IEngineProfile>& profile) override {
         return UnityIL2CPPAnalyzer::analyze(target, profile);
     }
@@ -51,7 +51,7 @@ public:
     // Resolver: butuh live process -- pakai runtime/SymbolResolver (xDL)
     // untuk resolve alamat libil2cpp.so yang sudah di-load, lalu cross-reference
     // dengan hasil analyze() di atas untuk dapat alamat konkret tiap method.
-    DumpResult resolveSymbols(const AnalysisTarget& target,
+    DumpData resolveSymbols(const AnalysisTarget& target,
                                const std::shared_ptr<IEngineProfile>& profile) override {
         return UnityIL2CPPResolver::resolveSymbols(target, profile);
     }

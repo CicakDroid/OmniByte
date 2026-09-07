@@ -1,5 +1,5 @@
 #pragma once
-// JsonWriter — Generates structured JSON dump from DumpResult.
+// JsonWriter — Generates structured JSON dump from DumpData.
 // Output format: JSON with types, methods, fields, strings, metadata.
 #include "../../ExportCore/IExporter/IExporter.h"
 #include "../../../DumperCore/DumpResult.h"
@@ -17,7 +17,7 @@ public:
         return "Structured JSON dump (machine-readable)";
     }
 
-    bool exportToFile(const DumpResult& result,
+    bool exportToFile(const DumpData& result,
                       const std::string& outputPath) const override {
         std::ofstream file(outputPath);
         if (!file.is_open()) return false;
@@ -26,7 +26,7 @@ public:
         return file.good();
     }
 
-    std::string exportToString(const DumpResult& result) const override {
+    std::string exportToString(const DumpData& result) const override {
         std::ostringstream out;
         out << std::hex;
 

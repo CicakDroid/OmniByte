@@ -15,9 +15,9 @@ namespace omnibyte::dumper::source2 {
 
 class Source2Resolver {
 public:
-    static DumpResult resolveSymbols(const AnalysisTarget& target,
+    static DumpData resolveSymbols(const AnalysisTarget& target,
                                      const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "Source2";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -45,7 +45,7 @@ public:
 private:
     static void resolveSchemaSymbols(const AnalysisTarget& target,
                                       const std::shared_ptr<IEngineProfile>& profile,
-                                      DumpResult& result) {
+                                      DumpData& result) {
         // Source 2 schema symbols
         static const char* kSchemaSymbols[] = {
             "ResourceSystem::Cache",

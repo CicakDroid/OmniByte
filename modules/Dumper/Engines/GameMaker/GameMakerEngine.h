@@ -40,13 +40,13 @@ public:
     }
 
     // Analyzer: parse data.win chunk statis (FORM/YYYG -> GEN8/STRG/OBJT)
-    DumpResult analyze(const AnalysisTarget& target,
+    DumpData analyze(const AnalysisTarget& target,
                         const std::shared_ptr<IEngineProfile>& profile) override {
         return GameMakerAnalyzer::analyze(target, profile);
     }
 
     // Resolver: resolve runtime struct offets via live process (yoyorun)
-    DumpResult resolveSymbols(const AnalysisTarget& target,
+    DumpData resolveSymbols(const AnalysisTarget& target,
                                const std::shared_ptr<IEngineProfile>& profile) override {
         return GameMakerResolver::resolveSymbols(target, profile);
     }

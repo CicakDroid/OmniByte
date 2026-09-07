@@ -1,5 +1,5 @@
 #pragma once
-// DummyDllWriter — Generates DummyDll-compatible C# assemblies from DumpResult.
+// DummyDllWriter — Generates DummyDll-compatible C# assemblies from DumpData.
 // Output format: .NET-style C# classes for tools like RuntimeDumper.
 #include "../../ExportCore/IExporter/IExporter.h"
 #include "../../ExportCore/SectionSplitter/SectionSplitter.h"
@@ -18,7 +18,7 @@ public:
         return "DummyDll-compatible C# assemblies (for RuntimeDumper, etc.)";
     }
 
-    bool exportToFile(const DumpResult& result,
+    bool exportToFile(const DumpData& result,
                       const std::string& outputPath) const override {
         std::ofstream file(outputPath);
         if (!file.is_open()) return false;
@@ -27,7 +27,7 @@ public:
         return file.good();
     }
 
-    std::string exportToString(const DumpResult& result) const override {
+    std::string exportToString(const DumpData& result) const override {
         std::ostringstream out;
 
         // Header
@@ -63,7 +63,7 @@ private:
     }
 
     void writeType(std::ostringstream& out, const TypeEntry& type,
-                   const DumpResult& result) const {
+                   const DumpData& result) const {
         // Determine if it's a class, struct, enum, or interface
         bool isInterface = type.name.find("I") == 0 && type.name.size() > 1 &&
                            std::isupper(type.name[1]);

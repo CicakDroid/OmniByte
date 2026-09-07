@@ -52,7 +52,7 @@ public:
 
     // Export using a specific format
     bool exportTo(const std::string& formatName,
-                  const DumpResult& result,
+                  const DumpData& result,
                   const std::string& outputPath) const {
         auto exporter = getExporter(formatName);
         if (!exporter) return false;
@@ -61,7 +61,7 @@ public:
 
     // Export using a specific format to string
     std::string exportToString(const std::string& formatName,
-                               const DumpResult& result) const {
+                               const DumpData& result) const {
         auto exporter = getExporter(formatName);
         if (!exporter) return "";
         return exporter->exportToString(result);

@@ -14,9 +14,9 @@ namespace omnibyte::dumper::godot {
 
 class GodotResolver {
 public:
-    static DumpResult resolveSymbols(const AnalysisTarget& target,
+    static DumpData resolveSymbols(const AnalysisTarget& target,
                                      const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "Godot";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -44,7 +44,7 @@ public:
 private:
     static void resolveClassDBSymbols(const AnalysisTarget& target,
                                        const std::shared_ptr<IEngineProfile>& profile,
-                                       DumpResult& result) {
+                                       DumpData& result) {
         // Core Godot symbols
         static const char* kClassDBSymbols[] = {
             "ClassDB::classes",

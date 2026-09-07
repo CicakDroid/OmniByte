@@ -1,7 +1,7 @@
 #pragma once
 // IExporter — Base interface for all dump export writers.
 // Each writer (CSharp, JSON, Header, DummyDll) implements this interface
-// to convert DumpResult into a specific output format.
+// to convert DumpData into a specific output format.
 #include "../../../DumperCore/DumpResult.h"
 #include <memory>
 #include <string>
@@ -21,13 +21,13 @@ public:
     // e.g. ".cs", ".json", ".h"
     virtual std::string fileExtension() const = 0;
 
-    // Export DumpResult to a file at outputPath
+    // Export DumpData to a file at outputPath
     // Returns true on success, false on failure
-    virtual bool exportToFile(const DumpResult& result,
+    virtual bool exportToFile(const DumpData& result,
                               const std::string& outputPath) const = 0;
 
-    // Export DumpResult to a string (for in-memory use or testing)
-    virtual std::string exportToString(const DumpResult& result) const = 0;
+    // Export DumpData to a string (for in-memory use or testing)
+    virtual std::string exportToString(const DumpData& result) const = 0;
 
     // Description of this exporter for help/listing
     virtual std::string description() const = 0;

@@ -1,5 +1,5 @@
 #pragma once
-// HeaderWriter — Generates C/C++ struct declarations from DumpResult.
+// HeaderWriter — Generates C/C++ struct declarations from DumpData.
 // Output format: C headers with structs, fields, padding, and size comments.
 #include "../../ExportCore/IExporter/IExporter.h"
 #include "../../ExportCore/SectionSplitter/SectionSplitter.h"
@@ -19,7 +19,7 @@ public:
         return "C/C++ struct declarations with offsets";
     }
 
-    bool exportToFile(const DumpResult& result,
+    bool exportToFile(const DumpData& result,
                       const std::string& outputPath) const override {
         std::ofstream file(outputPath);
         if (!file.is_open()) return false;
@@ -28,7 +28,7 @@ public:
         return file.good();
     }
 
-    std::string exportToString(const DumpResult& result) const override {
+    std::string exportToString(const DumpData& result) const override {
         std::ostringstream out;
 
         // Header guard
@@ -61,7 +61,7 @@ public:
 
 private:
     void writeStruct(std::ostringstream& out, const TypeEntry& type,
-                     const DumpResult& result) const {
+                     const DumpData& result) const {
         std::string safeName = sanitizeName(type.name);
 
         out << "// Size: 0x" << std::hex << std::setw(4) << std::setfill('0') << type.size << "\n";

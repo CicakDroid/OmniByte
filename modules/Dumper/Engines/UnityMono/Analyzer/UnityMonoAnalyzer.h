@@ -75,9 +75,9 @@ enum class MonoMethodFlag : uint16_t {
 
 class UnityMonoAnalyzer {
 public:
-    static DumpResult analyze(const AnalysisTarget& target,
+    static DumpData analyze(const AnalysisTarget& target,
                               const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "Unity Mono";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -371,9 +371,9 @@ private:
     }
 
     // Main metadata parse entry point
-    static DumpResult parseMetadata(const std::vector<uint8_t>& buf,
+    static DumpData parseMetadata(const std::vector<uint8_t>& buf,
                                     const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "Unity Mono";
         result.detectedVersion = profile->version();
 

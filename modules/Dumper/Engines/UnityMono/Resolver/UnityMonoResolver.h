@@ -15,9 +15,9 @@ namespace omnibyte::dumper::unitymono {
 
 class UnityMonoResolver {
 public:
-    static DumpResult resolveSymbols(const AnalysisTarget& target,
+    static DumpData resolveSymbols(const AnalysisTarget& target,
                                      const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "Unity Mono";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -195,9 +195,9 @@ private:
         }
     }
 
-    static DumpResult resolveFromProcess(const AnalysisTarget& target,
+    static DumpData resolveFromProcess(const AnalysisTarget& target,
                                          const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "Unity Mono";
         result.detectedVersion = profile->version();
 

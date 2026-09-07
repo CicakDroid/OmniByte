@@ -15,9 +15,9 @@ namespace omnibyte::dumper::cocos2d {
 
 class Cocos2dResolver {
 public:
-    static DumpResult resolveSymbols(const AnalysisTarget& target,
+    static DumpData resolveSymbols(const AnalysisTarget& target,
                                      const std::shared_ptr<IEngineProfile>& profile) {
-        DumpResult result;
+        DumpData result;
         result.engineName = "Cocos2d";
         result.detectedVersion = profile ? profile->version() : "unknown";
 
@@ -71,7 +71,7 @@ private:
 
     static void resolveSymbolTable(const AnalysisTarget& target,
                                     const std::shared_ptr<IEngineProfile>& profile,
-                                    DumpResult& result) {
+                                    DumpData& result) {
         // Try common symbols first
         for (const char* sym : kCommonSymbols) {
             tryResolveSymbol(target, profile, sym, result);
@@ -113,7 +113,7 @@ private:
     static void tryResolveSymbol(const AnalysisTarget& target,
                                   const std::shared_ptr<IEngineProfile>& profile,
                                   const std::string& key,
-                                  DumpResult& result) {
+                                  DumpData& result) {
         auto symName = profile->symbolFor(key);
         if (!symName) return;
 

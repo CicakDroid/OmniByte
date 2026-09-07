@@ -1,5 +1,5 @@
 #pragma once
-// SectionSplitter — Splits DumpResult into logical sections for organized output.
+// SectionSplitter — Splits DumpData into logical sections for organized output.
 // Groups types by namespace/package, methods by declaring type, etc.
 #include "../../../DumperCore/DumpResult.h"
 #include <algorithm>
@@ -24,7 +24,7 @@ public:
     // Split types by namespace/prefix convention.
     // UE4/UE5 types: prefix-based (e.g. "UObject" → "UE4")
     // IL2CPP types: dot-separated (e.g. "UnityEngine.GameObject" → "UnityEngine")
-    static std::vector<TypeSection> splitByNamespace(const DumpResult& result) {
+    static std::vector<TypeSection> splitByNamespace(const DumpData& result) {
         std::map<std::string, TypeSection> sectionMap;
 
         for (const auto& type : result.typeTable) {
@@ -47,7 +47,7 @@ public:
     }
 
     // Group methods by their declaring type
-    static std::vector<MethodSection> groupMethodsByType(const DumpResult& result) {
+    static std::vector<MethodSection> groupMethodsByType(const DumpData& result) {
         std::map<std::string, MethodSection> sectionMap;
 
         for (const auto& method : result.methodTable) {
@@ -69,7 +69,7 @@ public:
     }
 
     // Get fields for a specific type
-    static std::vector<FieldEntry> getFieldsForType(const DumpResult& result,
+    static std::vector<FieldEntry> getFieldsForType(const DumpData& result,
                                                      const std::string& typeName) {
         std::vector<FieldEntry> fields;
         for (const auto& field : result.fieldTable) {
@@ -86,7 +86,7 @@ public:
     }
 
     // Get methods for a specific type
-    static std::vector<MethodEntry> getMethodsForType(const DumpResult& result,
+    static std::vector<MethodEntry> getMethodsForType(const DumpData& result,
                                                        const std::string& typeName) {
         std::vector<MethodEntry> methods;
         for (const auto& method : result.methodTable) {

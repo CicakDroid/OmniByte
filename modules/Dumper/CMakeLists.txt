@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Base placeholder target for the dumper module.
-add_library(dumper STATIC dumper.cpp)
+add_library(dumper STATIC Dumper.cpp)
 
 add_subdirectory(DumperCore)
 add_subdirectory(Engines)

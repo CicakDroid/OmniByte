@@ -1,5 +1,5 @@
 #pragma once
-// CSharpWriter — Generates C# class declarations from DumpResult.
+// CSharpWriter — Generates C# class declarations from DumpData.
 // Output format: Il2CppDumper-style C# classes with fields and methods.
 #include "../../ExportCore/IExporter/IExporter.h"
 #include "../../ExportCore/SectionSplitter/SectionSplitter.h"
@@ -18,7 +18,7 @@ public:
         return "C# class declarations (Il2CppDumper-style)";
     }
 
-    bool exportToFile(const DumpResult& result,
+    bool exportToFile(const DumpData& result,
                       const std::string& outputPath) const override {
         std::ofstream file(outputPath);
         if (!file.is_open()) return false;
@@ -27,7 +27,7 @@ public:
         return file.good();
     }
 
-    std::string exportToString(const DumpResult& result) const override {
+    std::string exportToString(const DumpData& result) const override {
         std::ostringstream out;
 
         // Header comment
@@ -58,7 +58,7 @@ public:
 
 private:
     void writeType(std::ostringstream& out, const TypeEntry& type,
-                   const DumpResult& result) const {
+                   const DumpData& result) const {
         // Class declaration
         out << "    public class " << sanitizeName(type.name);
         if (!type.parentType.empty()) {

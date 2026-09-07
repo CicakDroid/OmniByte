@@ -6,9 +6,9 @@
 
 namespace omnibyte::dumper {
 
-DumpResult ResultNormalizer::mergeResults(const std::vector<DumpResult>& results) {
+DumpData ResultNormalizer::mergeResults(const std::vector<DumpData>& results) {
     if (results.empty()) {
-        DumpResult empty;
+        DumpData empty;
         empty.errorMessage = "No results to merge";
         return empty;
     }
@@ -18,7 +18,7 @@ DumpResult ResultNormalizer::mergeResults(const std::vector<DumpResult>& results
     }
 
     // Start with first successful result, or first result if all failed
-    DumpResult merged;
+    DumpData merged;
     for (const auto& r : results) {
         if (r.success) {
             merged = r;
@@ -47,8 +47,8 @@ DumpResult ResultNormalizer::mergeResults(const std::vector<DumpResult>& results
     return merged;
 }
 
-DumpResult ResultNormalizer::mergeResults(const DumpResult& a, const DumpResult& b) {
-    DumpResult result;
+DumpData ResultNormalizer::mergeResults(const DumpData& a, const DumpData& b) {
+    DumpData result;
     result.success = a.success || b.success;
     result.engineName = a.engineName + " + " + b.engineName;
     result.detectedVersion = a.detectedVersion.empty() ? b.detectedVersion : a.detectedVersion;

@@ -26,10 +26,10 @@ public:
     static std::optional<DetectionOutcome> detect(const AnalysisTarget& target);
 
     // Convenience: detect + analyze in one call.
-    static std::optional<DumpResult> detectAndAnalyze(const AnalysisTarget& target);
+    static std::optional<DumpData> detectAndAnalyze(const AnalysisTarget& target);
 
     // Convenience: detect + resolveSymbols in one call.
-    static std::optional<DumpResult> detectAndResolve(const AnalysisTarget& target);
+    static std::optional<DumpData> detectAndResolve(const AnalysisTarget& target);
 };
 
 } // namespace omnibyte::dumper
