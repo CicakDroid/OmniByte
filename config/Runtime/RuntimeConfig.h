@@ -33,6 +33,12 @@ struct RuntimeConfig {
     // Maximum number of retries when attaching to a process.
     uint32_t maxAttachRetries = 3;
 
+    std::vector<std::string> rootBackendPriority = {"KernelSU", "SukiSU-Ultra", "Sui", "RootThread"};
+    bool requireStealth = false;
+    std::vector<std::string> hookBackendPriority = {"KittyMemory", "Inlinehook", "Vector",
+                                                     "Albatross", "Bhook", "KittyMemoryEx"};
+    bool enableMemoryWrite = false;
+
     static RuntimeConfig defaults() { return {}; }
 
     static RuntimeConfig fromJson(const nlohmann::json& j) {
@@ -50,8 +56,16 @@ struct RuntimeConfig {
             else if (pol == "LargestModule") cfg.pidSelectionPolicy = PidSelectionPolicy::LargestModule;
             else if (pol == "UserPrompt")    cfg.pidSelectionPolicy = PidSelectionPolicy::UserPrompt;
             else if (pol == "Foreground")    cfg.pidSelectionPolicy = PidSelectionPolicy::Foreground;
-            // unknown string → keep default
         }
+
+        if (j.contains("rootBackendPriority") && j.at("rootBackendPriority").is_array()) {
+            cfg.rootBackendPriority = j.at("rootBackendPriority").get<std::vector<std::string>>();
+        }
+        cfg.requireStealth = omnibyte::common::getOr<bool>(j, "requireStealth", cfg.requireStealth);
+        if (j.contains("hookBackendPriority") && j.at("hookBackendPriority").is_array()) {
+            cfg.hookBackendPriority = j.at("hookBackendPriority").get<std::vector<std::string>>();
+        }
+        cfg.enableMemoryWrite = omnibyte::common::getOr<bool>(j, "enableMemoryWrite", cfg.enableMemoryWrite);
 
         return cfg;
     }
@@ -71,7 +85,11 @@ struct RuntimeConfig {
             {"stealthReadStrategy",      stealthReadStrategy},
             {"discoveryUseRootDefault",  discoveryUseRootDefault},
             {"memReadChunkSizeBytes",    memReadChunkSizeBytes},
-            {"maxAttachRetries",         maxAttachRetries}
+            {"maxAttachRetries",         maxAttachRetries},
+            {"rootBackendPriority",      rootBackendPriority},
+            {"requireStealth",           requireStealth},
+            {"hookBackendPriority",      hookBackendPriority},
+            {"enableMemoryWrite",        enableMemoryWrite}
         };
     }
 };
