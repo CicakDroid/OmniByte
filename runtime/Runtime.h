@@ -18,13 +18,15 @@
 
 namespace omnibyte::runtime {
 
+using omnibyte::dumper::config::RuntimeConfig;
+
 class Runtime {
 public:
     Runtime() = default;
     ~Runtime() = default;
 
     omnibyte::dumper::DumpResult attach(pid_t pid,
-                                         const config::RuntimeConfig& cfg);
+                                         const RuntimeConfig& cfg);
 
     void detach();
 
@@ -45,7 +47,7 @@ public:
     bool isStealthActive() const;
 
 private:
-    config::RuntimeConfig cfg_;
+    RuntimeConfig cfg_;
     pid_t pid_ = 0;
 
     ProcessManager processMgr_;

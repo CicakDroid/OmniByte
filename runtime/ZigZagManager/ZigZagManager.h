@@ -8,6 +8,8 @@
 
 namespace omnibyte::runtime {
 
+using omnibyte::dumper::config::RuntimeConfig;
+
 class ZigZagManager {
 public:
     ZigZagManager() = default;
@@ -16,7 +18,7 @@ public:
     /// Select best available backend and activate stealth for target process.
     /// Returns DumpResult::Success or StealthUnavailable.
     DumpResult selectAndActivate(pid_t pid,
-                                 const config::RuntimeConfig& cfg);
+                                 const RuntimeConfig& cfg);
 
     /// Deactivate the current stealth backend (unhide + release).
     void deactivate();

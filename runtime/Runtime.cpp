@@ -4,7 +4,7 @@ namespace omnibyte::runtime {
 
 using DR = omnibyte::dumper::DumpResult;
 
-DR Runtime::attach(pid_t pid, const config::RuntimeConfig& cfg) {
+DR Runtime::attach(pid_t pid, const RuntimeConfig& cfg) {
     if (isAttached()) return DR::InvalidRequest;
 
     cfg_ = cfg;

@@ -10,7 +10,7 @@
 namespace omnibyte::runtime {
 
 DumpResult ZigZagManager::selectAndActivate(pid_t pid,
-                                             const config::RuntimeConfig& cfg) {
+                                             const RuntimeConfig& cfg) {
     // Try Diamorphine first (LKM-based, stronger but riskier)
     auto diamorphine = std::make_shared<backends::DiamorphineAdapter>();
     if (diamorphine->isAvailable()) {
