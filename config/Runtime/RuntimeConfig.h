@@ -37,6 +37,7 @@ struct RuntimeConfig {
     bool requireStealth = false;
     std::vector<std::string> hookBackendPriority = {"KittyMemory", "Inlinehook", "Vector",
                                                      "Albatross", "Bhook", "KittyMemoryEx"};
+    std::vector<std::string> stealthBackendPriority = {"Diamorphine", "Bypasser"};
     bool enableMemoryWrite = false;
 
     static RuntimeConfig defaults() { return {}; }
@@ -65,6 +66,9 @@ struct RuntimeConfig {
         if (j.contains("hookBackendPriority") && j.at("hookBackendPriority").is_array()) {
             cfg.hookBackendPriority = j.at("hookBackendPriority").get<std::vector<std::string>>();
         }
+        if (j.contains("stealthBackendPriority") && j.at("stealthBackendPriority").is_array()) {
+            cfg.stealthBackendPriority = j.at("stealthBackendPriority").get<std::vector<std::string>>();
+        }
         cfg.enableMemoryWrite = omnibyte::common::getOr<bool>(j, "enableMemoryWrite", cfg.enableMemoryWrite);
 
         return cfg;
@@ -89,6 +93,7 @@ struct RuntimeConfig {
             {"rootBackendPriority",      rootBackendPriority},
             {"requireStealth",           requireStealth},
             {"hookBackendPriority",      hookBackendPriority},
+            {"stealthBackendPriority",   stealthBackendPriority},
             {"enableMemoryWrite",        enableMemoryWrite}
         };
     }

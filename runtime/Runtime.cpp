@@ -43,7 +43,7 @@ std::optional<std::vector<uint8_t>> Runtime::readMemory(uintptr_t address, size_
     if (!isAttached()) return std::nullopt;
 
     if (cfg_.stealthReadStrategy == "syscall_proxy") {
-        return memoryIO_.readViaProxy(pid_, address, size);
+        return memoryIO_.readViaHook(pid_, address, size);
     }
     return memoryIO_.readChunk(pid_, address, size, cfg_.memReadChunkSizeBytes);
 }

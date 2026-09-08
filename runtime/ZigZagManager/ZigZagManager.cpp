@@ -1,5 +1,5 @@
 // ZigZagManager — select and activate the best stealth backend.
-// Priority: Diamorphine → Bypasser → StealthUnavailable.
+// Iterates cfg.stealthBackendPriority; first available backend wins.
 
 #include "ZigZagManager.h"
 #include "modules/Dumper/Dumper.h"
@@ -9,37 +9,36 @@
 
 namespace omnibyte::runtime {
 
+static std::shared_ptr<IStealthBackend> createBackend(const std::string& name) {
+    if (name == "Diamorphine") return std::make_shared<backends::DiamorphineAdapter>();
+    if (name == "Bypasser")    return std::make_shared<backends::BypasserAdapter>();
+    return nullptr;
+}
+
 DumpResult ZigZagManager::selectAndActivate(pid_t pid,
                                              const RuntimeConfig& cfg) {
-    // Try Diamorphine first (LKM-based, stronger but riskier)
-    auto diamorphine = std::make_shared<backends::DiamorphineAdapter>();
-    if (diamorphine->isAvailable()) {
-        active_ = std::make_unique<ZigZag>(diamorphine);
+    for (const auto& name : cfg.stealthBackendPriority) {
+        auto backend = createBackend(name);
+        if (!backend || !backend->isAvailable()) continue;
+
+        active_ = std::make_unique<ZigZag>(backend);
         if (active_->hide(pid)) {
+            pid_ = pid;
             return omnibyte::dumper::DumpResult::Success;
         }
+        active_.reset();
     }
 
-    // Fallback to Bypasser (userspace, lighter)
-    auto bypasser = std::make_shared<backends::BypasserAdapter>();
-    if (bypasser->isAvailable()) {
-        active_ = std::make_unique<ZigZag>(bypasser);
-        if (active_->hide(pid)) {
-            return omnibyte::dumper::DumpResult::Success;
-        }
-    }
-
-    // Both failed
-    active_.reset();
+    pid_ = 0;
     return omnibyte::dumper::DumpResult::StealthUnavailable;
 }
 
 void ZigZagManager::deactivate() {
-    if (active_ && active_->isActive()) {
-        // Note: we don't know the pid here — unhide requires pid.
-        // The Runtime facade tracks pid and calls unhide before deactivate.
+    if (active_ && active_->isActive() && pid_ > 0) {
+        active_->unhide(pid_);
     }
     active_.reset();
+    pid_ = 0;
 }
 
 IStealthBackend* ZigZagManager::activeBackend() const {
