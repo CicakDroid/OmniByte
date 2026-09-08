@@ -13,6 +13,13 @@
 
 namespace omnibyte::runtime {
 
+/// Process instance with UID and Android user profile.
+struct ProcessInstance {
+    pid_t pid = 0;
+    uid_t uid = 0;
+    uint32_t userProfileId = 0;  // uid / 100000
+};
+
 class ProcessManager {
 public:
     ProcessManager() = default;
@@ -29,13 +36,22 @@ public:
     /// Parse /proc/<pid>/maps, return list of memory regions.
     std::vector<MemoryRegion> getMemoryMaps(pid_t pid);
 
-    /// Find PID by package name (scan /proc/*/cmdline).
+    /// Find first PID by package name (scan /proc/*/cmdline).
     std::optional<pid_t> findPidByPackageName(const std::string& packageName);
+
+    /// Find ALL process instances matching package name.
+    /// Parses UID from /proc/<pid>/status, computes userProfileId = uid / 100000.
+    /// cmdline null-byte separator handled: reads only to first null.
+    std::vector<ProcessInstance> findAllInstancesByPackageName(
+        const std::string& packageName);
 
     /// Check if currently attached.
     bool isAttached() const;
 
 private:
+    /// Read UID from /proc/<pid>/status Uid: line.
+    std::optional<uid_t> readUid(pid_t pid) const;
+
     bool attached_ = false;
     pid_t attachedPid_ = 0;
 };

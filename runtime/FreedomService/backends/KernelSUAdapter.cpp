@@ -51,15 +51,21 @@ IFreedomBackend::ExecResult KernelSUAdapter::execCommand(const std::string& cmd)
 }
 
 bool KernelSUAdapter::probeKernelSU() const {
-    // Check 1: /data/adb/ksu directory exists
     struct stat st;
-    if (stat("/data/adb/ksu", &st) != 0) return false;
 
-    // Check 2: /dev/kernelsu character device accessible
-    if (stat("/dev/kernelsu", &st) != 0) return false;
-    if (!S_ISCHR(st.st_mode)) return false;
+    // Path A: /dev/kernelsu char device
+    if (stat("/dev/kernelsu", &st) == 0 && S_ISCHR(st.st_mode)) return true;
 
-    return true;
+    // Path B: su binary present
+    if (stat("/data/adb/ksu/bin/su", &st) == 0) return true;
+
+    // Path C: prctl probe — user-specified: magic from tiann/KernelSU → kernel/include/uapi/linux/ksu.h
+    // TODO: isi nilai magic dari file tsb, jangan hardcode tebakan
+    // constexpr int KSU_MAGIC = ???;
+    // constexpr unsigned long PR_SET_MODULE = 42;
+    // if (prctl(PR_SET_MODULE, KSU_MAGIC, 0, 0, 0) == 0) return true;
+
+    return false;
 }
 
 } // namespace omnibyte::runtime::backends

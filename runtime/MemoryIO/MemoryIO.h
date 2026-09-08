@@ -29,22 +29,24 @@ public:
                                                    size_t size,
                                                    uint32_t chunkSizeBytes);
 
-    /// Read via syscall proxy path (stealthReadStrategy == "syscall_proxy").
-    /// Delegates to FreedomServiceBridge — actual anti-detection technique
-    /// is backend-specific (TODO: ptrace-based, /proc/mem stealth variants).
-    std::optional<std::vector<uint8_t>> readViaProxy(pid_t pid, uintptr_t addr,
-                                                      size_t size);
+    /// Read a FILE (not live memory) via root-privileged path.
+    /// Use for SemiAuto mode: reading .dat / config from another app's data dir.
+    /// NOT for reading live process memory — use readChunk for that.
+    std::optional<std::vector<uint8_t>> readViaProxy(const std::string& path);
 
-    /// Write process memory. DISABLED by default — only active when
-    /// RuntimeConfig.enableMemoryWrite == true. Bails out if flag is off.
+    /// Read via HPT hook trampoline — placeholder until HPT is fully implemented.
+    std::optional<std::vector<uint8_t>> readViaHook(pid_t pid, uintptr_t addr,
+                                                    size_t size);
+
+    /// Write process memory via pwrite on /proc/<pid>/mem.
+    /// Guarded by RuntimeConfig.enableMemoryWrite — caller must pass the flag.
     bool writeChunk(pid_t pid, uintptr_t addr, const uint8_t* data, size_t size,
                     bool writeEnabled);
 
 private:
-    /// Open /proc/<pid>/mem, return fd or -1.
     int openProcMem(pid_t pid);
+    int openProcMemForWrite(pid_t pid);
 
-    /// Read exactly `size` bytes from open fd at offset using pread loop.
     std::optional<std::vector<uint8_t>> preadAll(int fd, uintptr_t addr, size_t size,
                                                   uint32_t chunkSize);
 };

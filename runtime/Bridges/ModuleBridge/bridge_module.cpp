@@ -32,10 +32,13 @@ void ModuleBridge::registerMethods(JNIEnv* env) {
 
 jboolean ModuleBridge::nativeActivateStealth(JNIEnv* env, jobject thiz, jint pid) {
     (void)thiz;
-    // TODO: Fetch RuntimeConfig to pass to selectAndActivate.
     omnibyte::dumper::config::RuntimeConfig cfg;
     auto result = getZigZagManager()->selectAndActivate(
         static_cast<pid_t>(pid), cfg);
+    if (result == omnibyte::dumper::DumpResult::StealthUnavailable) {
+        env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),
+                      "StealthUnavailable");
+    }
     return result == omnibyte::dumper::DumpResult::Success ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -53,6 +56,11 @@ jstring ModuleBridge::nativeGetActiveHookBackend(JNIEnv* env, jobject thiz) {
 jboolean ModuleBridge::nativeInstallHook(JNIEnv* env, jobject thiz,
                                           jlong addr, jlong replacement, jlong originalOut) {
     (void)thiz;
+    if (getHPT()->activeBackendName().empty()) {
+        env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),
+                      "HookFailed");
+        return JNI_FALSE;
+    }
     bool ok = getHPT()->hookFunction(
         static_cast<uintptr_t>(addr),
         reinterpret_cast<void*>(replacement),

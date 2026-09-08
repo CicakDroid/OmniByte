@@ -67,20 +67,19 @@ IFreedomBackend::ExecResult SukiSUUltraAdapter::execCommand(const std::string& c
 }
 
 bool SukiSUUltraAdapter::probeSukiSUUltra() const {
-    // SukiSU-Ultra specific detection:
-    // 1. Check /data/adb/sukisu/ directory (SukiSU-specific marker)
     struct stat st;
+
+    // SukiSU-specific marker directory
     if (stat("/data/adb/sukisu", &st) == 0) return true;
 
-    // 2. Check KernelSU directory AND verify SukiSU module is present
-    if (stat("/data/adb/ksu", &st) != 0) return false;
-
-    // Check for SukiSU-specific config files in KernelSU directory
-    std::ifstream ksuConfig("/data/adb/ksu/.sukisu_config");
-    if (ksuConfig.good()) return true;
-
-    // Check for SukiSU module directory
+    // KernelSU directory with SukiSU module installed
     if (stat("/data/adb/ksu/modules/sukisu", &st) == 0) return true;
+
+    // TODO: Upstream marker — ShirkNix/SukiSU_Ultra may expose a version file
+    // at a path like /data/adb/ksu/sukisu_version or similar.
+    // Once upstream confirms the path, add detection here.
+    // std::ifstream ver("/data/adb/ksu/sukisu_version");
+    // if (ver.good()) return true;
 
     return false;
 }

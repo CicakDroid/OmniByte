@@ -24,18 +24,13 @@ std::optional<std::vector<uint8_t>> MemoryIO::readChunk(pid_t pid, uintptr_t add
     return result;
 }
 
-std::optional<std::vector<uint8_t>> MemoryIO::readViaProxy(pid_t pid, uintptr_t addr,
-                                                            size_t size) {
-    // TODO: Implement syscall_proxy stealth read.
-    // Possible techniques:
-    //   - ptrace PEEKDATA in small chunks (slower but avoids /proc/mem open)
-    //   - process_vm_readv (if available and not blocked by SELinux)
-    //   - Delegate to FreedomServiceBridge for root-assisted read
-    // For now, fall back to direct /proc/mem read — same as readChunk.
-    // The proxy backend is where anti-detection logic belongs:
-    //   - randomized chunk timing
-    //   - scattering reads across memory regions
-    //   - using legitimate-looking syscall patterns
+std::optional<std::vector<uint8_t>> MemoryIO::readViaProxy(const std::string& path) {
+    (void)path;
+    return std::nullopt;
+}
+
+std::optional<std::vector<uint8_t>> MemoryIO::readViaHook(pid_t pid, uintptr_t addr,
+                                                           size_t size) {
     (void)pid; (void)addr; (void)size;
     return std::nullopt;
 }
@@ -45,10 +40,9 @@ bool MemoryIO::writeChunk(pid_t pid, uintptr_t addr, const uint8_t* data,
     if (!writeEnabled) return false;
     if (!data || size == 0) return false;
 
-    int fd = openProcMem(pid);
+    int fd = openProcMemForWrite(pid);
     if (fd < 0) return false;
 
-    // Write in a single pread for simplicity; chunk if needed for large writes.
     ssize_t written = pwrite(fd, data, size, static_cast<off_t>(addr));
     ::close(fd);
     return written == static_cast<ssize_t>(size);
@@ -57,6 +51,11 @@ bool MemoryIO::writeChunk(pid_t pid, uintptr_t addr, const uint8_t* data,
 int MemoryIO::openProcMem(pid_t pid) {
     std::string path = "/proc/" + std::to_string(pid) + "/mem";
     return ::open(path.c_str(), O_RDONLY);
+}
+
+int MemoryIO::openProcMemForWrite(pid_t pid) {
+    std::string path = "/proc/" + std::to_string(pid) + "/mem";
+    return ::open(path.c_str(), O_WRONLY);
 }
 
 std::optional<std::vector<uint8_t>> MemoryIO::preadAll(int fd, uintptr_t addr,

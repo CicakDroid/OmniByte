@@ -37,16 +37,9 @@ std::optional<std::string> SuiAdapter::readFilePrivileged(const std::string& pat
 
 IFreedomBackend::ExecResult SuiAdapter::execCommand(const std::string& cmd) {
     ExecResult result;
-
-    // Sui path via Shizuku's service runner.
-    // In production: use Shizuku AIDL to execute commands through Sui's
-    // granted root permission. This requires:
-    //   1. Shizuku service running (shizuku_server)
-    //   2. Sui module active
-    //   3. Our package granted root via Sui's UI
-    //
-    // Simplified: try to use Shizuku's shell command execution.
-    std::string fullCmd = "sh -c 'su -c \"" + cmd + "\"'";
+    // TODO: Route through JNI binder — Sui has no su binary.
+    // env->CallObjectMethod(freedomServiceObj, jniExecCommandMethod, cmd);
+    std::string fullCmd = "sh -c '" + cmd + "'";
 
     FILE* pipe = popen(fullCmd.c_str(), "r");
     if (!pipe) return result;
