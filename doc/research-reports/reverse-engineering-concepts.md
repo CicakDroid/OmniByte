@@ -3,7 +3,7 @@
 **Nama Proyek:** Pengembangan OmniByte
 **Tanggal:** 2026-09-05
 **Status:** Final
-**Revisi:** 4.0 — Reorganisasi Workflow RE + Penambahan Tools, Root Access, Protobuf, SQL Hook, Mod Menu
+**Revisi:** 4.1 — Penambahan SukiSU-Ultra (segmentasi), Libsu (segmentasi), DLL (segmentasi + metode), Dumper/Engines/Profiles File Types
 
 ---
 
@@ -69,7 +69,7 @@
 
 42. [SukiSU-Ultra](#42-sukisu-ultra)
 43. [Libsu](#43-libsu)
-44. [Kernel Driver untuk Android Rooting](#44-kernel-driver-untuk-android-rooting)
+44. [DLL (Dynamic Link Library)](#44-dll-dynamic-link-library)
 45. [xdl (Extended Dynamic Linker)](#45-xdl-extended-dynamic-linker)
 46. [Varian Root Lainnya](#46-varian-root-lainnya)
 
@@ -81,7 +81,8 @@
 50. [Mod Menu Implementation Flow](#50-mod-menu-implementation-flow)
 
 51. [Kesimpulan & Relevansi untuk OmniByte](#51-kesimpulan--relevansi-untuk-omnibyte)
-52. [Daftar Pustaka & Sitasi](#52-daftar-pustaka--situsi)
+52. [Native Binary & Metadata File Types (Dumper/Engines/Profiles)](#52-native-binary--metadata-file-types-dumperenginesprofiles)
+53. [Daftar Pustaka & Sitasi](#53-daftar-pustaka--situsi)
 
 ---
 
@@ -1263,83 +1264,104 @@ SukiSU-Ultra adalah **kernel-based Android root solution** yang merupakan fork d
 
 **GitHub:** https://github.com/ShirkNeko/SukiSU-Ultra
 
-### Arsitektur
+### Segmentation
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    SukiSU-Ultra Architecture                 │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │                   KERNEL LEVEL (Ring 0)               │  │
-│  │                                                       │  │
-│  │  ┌─────────────────┐  ┌─────────────────────────┐   │  │
-│  │  │ KernelSU Base   │  │ KPM (Kernel Patch Module)│   │  │
-│  │  │ • su binary     │  │ • Custom kernel patches   │   │  │
-│  │  │ • Root mgmt     │  │ • SELinux bypass          │   │  │
-│  │  │ • Module system │  │ • Mount hiding            │   │  │
-│  │  └─────────────────┘  └─────────────────────────┘   │  │
-│  │                                                       │  │
-│  │  ┌─────────────────────────────────────────────────┐  │  │
-│  │  │              SUSFS (Root Hiding)                 │  │  │
-│  │  │ • Filesystem manipulation                        │  │  │
-│  │  │ • Process hiding                                 │  │  │
-│  │  │ • Mount namespace isolation                      │  │  │
-│  │  └─────────────────────────────────────────────────┘  │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                                                             │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │                USERSPACE LEVEL (Ring 3)               │  │
-│  │                                                       │  │
-│  │  ┌─────────────────┐  ┌─────────────────────────┐   │  │
-│  │  │ Manager App     │  │ Module System             │   │  │
-│  │  │ • Root granting │  │ • Magic Mount             │   │  │
-│  │  │ • App profiles  │  │ • Module installation     │   │  │
-│  │  │ • SUSFS config  │  │ • Systemless modifications│   │  │
-│  │  └─────────────────┘  └─────────────────────────┘   │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+SukiSU-Ultra Architecture
+├── 1. Kernel Level (Ring 0)
+│   ├── KernelSU Base
+│   │   ├── su binary management
+│   │   ├── Root granting mechanism
+│   │   └── Module loading system
+│   ├── KPM (Kernel Patch Module)
+│   │   ├── Custom kernel patches
+│   │   ├── SELinux bypass
+│   │   ├── Mount namespace manipulation
+│   │   └── Syscall table hooking
+│   └── SUSFS (Root Hiding)
+│       ├── Filesystem manipulation
+│       ├── Process hiding from /proc
+│       ├── Mount namespace isolation
+│       └── Proc/sysfs filtering
+│
+├── 2. Userspace Level (Ring 3)
+│   ├── Manager App
+│   │   ├── Root granting UI
+│   │   ├── Per-app root profiles
+│   │   ├── SUSFS configuration
+│   │   └── Module management
+│   └── Module System
+│       ├── Magic Mount (systemless)
+│       ├── Module installation API
+│       ├── Module lifecycle hooks
+│       └── Overlay filesystem
+│
+└── 3. Detection Evasion Layer
+    ├── su binary path hiding
+    ├── Kernel version spoofing
+    ├── CPU info obfuscation
+    └── SELinux context manipulation
 ```
 
-### Mekanisme Kernel Patching
+### Metode Kernel Patching
 
 #### 1. SELinux Bypass
 ```c
 // Menulis ke /sys/fs/selinux/enforce → permissive mode
 // Memungkinkan akses tanpa batas SELinux
+void set_selinux_permissive() {
+    int fd = open("/sys/fs/selinux/enforce", O_WRONLY);
+    write(fd, "0", 1);  // 0 = permissive
+    close(fd);
+}
 ```
 
 #### 2. Mount Hiding
 ```c
 // Unmount path yang mengungkap root:
 // - /proc/tty/drivers
-// - /proc/net/if_inet6
+// - /proc/net/if_inet6  
 // - /sys/class/net
 // - /proc/self/maps
+void hide_mounts() {
+    umount2("/proc/tty/drivers", MNT_DETACH);
+    umount2("/proc/net/if_inet6", MNT_DETACH);
+    umount2("/sys/class/net", MNT_DETACH);
+    umount2("/proc/self/maps", MNT_DETACH);
+}
 ```
 
 #### 3. UTS Spoofing
 ```c
 // Mengubah kernel release string di /proc/version
 // Menyembunyikan kernel custom
+void spoof_kernel_version() {
+    // Patch uname syscall to return stock kernel string
+    char *stock_version = "5.10.101-android12-9-gb12345";
+    // Intercept __arm64_sys_uname
+}
 ```
 
 #### 4. CPU Spoofing
 ```c
 // Modifikasi /proc/cpuinfo
 // Menyembunyikan VM/emulator signature
+void spoof_cpuinfo() {
+    // Hook proc filesystem read
+    // Filter CPU hardware/vendor fields
+    // Return stock device signature
+}
 ```
 
 #### 5. su Binary Detection Bypass
 ```
-Path yang di-check:
-/system/bin/su
-/system/xbin/su
-/sbin/su
-/data/adb/ksu/bin/su
-/data/adb/ap/bin/su
-/data/adb/su
+Path yang di-check & cara bypass:
+├── /system/bin/su → Hide via mount namespace
+├── /system/xbin/su → Hide via mount namespace  
+├── /sbin/su → Hide via mount namespace
+├── /data/adb/ksu/bin/su → Rename/hide
+├── /data/adb/ap/bin/su → Rename/hide
+└── /data/adb/su → Hide from ls output
 ```
 
 ### Fitur Utama
@@ -1375,34 +1397,114 @@ Path yang di-check:
 ### Definisi
 Libsu adalah **Android Java/Kotlin library** yang menyediakan API untuk root operations secara programmatic. Tidak melakukan kernel patching — hanya **menggunakan** root yang sudah tersedia.
 
-### Arsitektur
+### Segmentation
 
 ```
-┌─────────────────────────────────────────────────┐
-│                  Libsu API                       │
-├─────────────────────────────────────────────────┤
-│                                                   │
-│  ┌─────────────┐  ┌─────────────┐              │
-│  │  SuProcess  │  │   SuFile    │              │
-│  │  • exec()   │  │  • read()   │              │
-│  │  • shell()  │  │  • write()  │              │
-│  │  • close()  │  │  • exists() │              │
-│  └─────────────┘  └─────────────┘              │
-│                                                   │
-│  ┌─────────────┐  ┌─────────────┐              │
-│  │     Sh      │  │    Job      │              │
-│  │  • open()   │  │  • add()    │              │
-│  │  • cmd()    │  │  • exec()   │              │
-│  │  • close()  │  │  • callback │              │
-│  └─────────────┘  └─────────────┘              │
-│                                                   │
-└─────────────────────────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────────────┐
-│         Root Access Provider                     │
-│  (Magisk, KernelSU, SukiSU, SuperSU, etc.)     │
-└─────────────────────────────────────────────────┘
+Libsu Architecture
+├── 1. API Layer (Java/Kotlin)
+│   ├── SuProcess
+│   │   ├── exec() - Execute root command
+│   │   ├── shell() - Interactive shell session
+│   │   ├── close() - Terminate process
+│   │   └── isRoot() - Check root availability
+│   ├── SuFile
+│   │   ├── read() - Read file as root
+│   │   ├── write() - Write file as root
+│   │   ├── exists() - Check file existence
+│   │   ├── delete() - Delete file as root
+│   │   └── mkdir() - Create directory as root
+│   ├── Shell
+│   │   ├── open() - Open shell session
+│   │   ├── cmd() - Execute command
+│   │   ├── close() - Close session
+│   │   └── isRoot() - Check root status
+│   └── Job
+│       ├── add() - Queue command
+│       ├── exec() - Execute queue
+│       ├── callback() - Async result handler
+│       └── submit() - Submit for execution
+│
+├── 2. Root Provider Interface
+│   ├── Magisk Provider
+│   │   ├── su binary path: /sbin/su, /system/bin/su
+│   │   └── Request handling via intents
+│   ├── KernelSU Provider
+│   │   ├── su binary path: /data/adb/ksu/bin/su
+│   │   └── Direct kernel-level access
+│   ├── SukiSU Provider
+│   │   ├── su binary path: /data/adb/ksu/bin/su
+│   │   └── Kernel-based with SUSFS
+│   └── SuperSU Provider (legacy)
+│       ├── su binary path: /system/xbin/su
+│       └── Classic su management
+│
+└── 3. Execution Layer
+    ├── Native Process Management
+    │   ├── fork()/exec() for su
+    │   ├── Pipe stdin/stdout/stderr
+    │   └── Process lifecycle control
+    ├── Command Parsing
+    │   ├── Shell syntax support
+    │   ├── Pipe redirection
+    │   └── Environment variables
+    └── Result Handling
+        ├── Synchronous execution
+        ├── Asynchronous callbacks
+        └── Output stream processing
+```
+
+### Metode Root Access
+
+#### 1. Root Detection
+```kotlin
+// Check if root is available
+val isRooted = Shell.getShell().isRoot
+
+// Check su binary existence
+val suFile = SuFile("/system/bin/su")
+if (suFile.exists()) {
+    // Root available
+}
+```
+
+#### 2. Command Execution
+```kotlin
+// Synchronous execution
+val result = Shell.cmd("id").exec()
+val output = result.out.joinToString("\n")
+
+// Asynchronous execution
+Shell.cmd("ls /data/data/com.app/databases")
+    .callback { result ->
+        if (result.isSuccess) {
+            val files = result.out
+        }
+    }
+    .submit()
+```
+
+#### 3. File Operations
+```kotlin
+// Read file as root
+val file = SuFile("/data/data/com.app/shared_prefs/config.xml")
+val content = file.readText()
+
+// Write file as root
+file.writeText("<xml>modified data</xml>")
+
+// Check file permissions
+if (file.canRead()) {
+    val stream = file.inputStream()
+}
+```
+
+#### 4. Shell Session
+```kotlin
+// Interactive shell session
+val shell = Shell.open()
+shell.cmd("cd /data/data/com.app")
+shell.cmd("ls -la databases/")
+val output = shell.close()
 ```
 
 ### Contoh Penggunaan
@@ -1442,51 +1544,179 @@ Shell.cmd("rm -rf /data/cache/target")
 
 ---
 
-## 44. Kernel Driver untuk Android Rooting
+## 44. DLL (Dynamic Link Library)
 
-### Perbandingan Pendekatan
+### Definisi
+DLL (Dynamic Link Library) adalah **shared library** yang di-load secara dinamis saat runtime. Di Android/Linux berupa `.so` (Shared Object), di Windows berupa `.dll`. Dalam reverse engineering, DLL adalah target utama karena berisi kode executable yang bisa di-analisis, di-hook, atau di-modifikasi.
 
-| Pendekatan | Mekanisme | Contoh |
-|------------|-----------|--------|
-| **KPM (Kernel Patch Module)** | Patch kernel code langsung | SukiSU, KernelSU |
-| **Loadable Kernel Module (.ko)** | Load via insmod/modprobe | KernelPatch |
-| **Binder-based** | IPC userspace↔kernel | Magisk |
-| **Boot image patching** | Patch boot partition | Magisk, KernelSU |
+### Segmentation
 
-### Mekanisme Kernel Patching
-
-#### 1. Syscall Table Hooking
-```c
-// Memodifikasi syscall table untuk intercept panggilan
-// Contoh: hook __arm64_sys_openat untuk memfilter file access
+```
+DLL Analysis Workflow
+├── 1. Extraction Phase
+│   ├── Static extraction (.so/.dll from APK/PE)
+│   ├── Runtime extraction (memory dump)
+│   └── ELF/PE header parsing
+│
+├── 2. Analysis Phase
+│   ├── Symbol table analysis
+│   ├── Import/Export table (IAT/EAT)
+│   ├── PLT/GOT resolution
+│   └── Dynamic symbol resolution
+│
+├── 3. Hooking Phase
+│   ├── PLT hooking (GOT overwrite)
+│   ├── Inline hooking (function prologue patch)
+│   ├── PLT bypass (direct symbol resolution)
+│   └── xdl/dlsym-based hooking
+│
+└── 4. Modification Phase
+    ├── Code patching (NOP, jump, call)
+    ├── Data modification (globals, strings)
+    ├── Load address manipulation
+    └── Symbol interposition
 ```
 
-#### 2. Credential Modification
-```c
-// Memodifikasi cred struct untuk privilege escalation
-// Contoh: ubah uid/gid process menjadi 0 (root)
+### Metode Analisis
+
+#### 1. ELF Binary Analysis (Linux/Android)
+```
+ELF Structure:
+├── ELF Header (e_ident, e_type, e_machine, e_entry)
+├── Program Headers (PT_LOAD, PT_DYNAMIC, PT_INTERP)
+├── Section Headers (.text, .rodata, .data, .bss, .plt, .got)
+├── Symbol Table (.symtab, .dynsym)
+├── String Table (.strtab, .dynstr)
+├── Dynamic Section (DT_NEEDED, DT_SYMTAB, DT_JMPREL)
+└── Relocation Entries (R_*_JUMP_SLOT, R_*_GLOB_DAT)
 ```
 
-#### 3. SELinux Hooking
-```c
-// Hook selinux_inode_permission untuk bypass policy
-// Memungkinkan akses tanpa batas SELinux
+#### 2. PE Binary Analysis (Windows)
+```
+PE Structure:
+├── DOS Header (MZ signature)
+├── PE Signature (PE\0\0)
+├── COFF Header (machine, numberOfSections)
+├── Optional Header (ImageBase, AddressOfEntryPoint)
+├── Section Table (.text, .rdata, .data, .rsrc)
+├── Import Directory Table (IAT)
+├── Export Directory Table (EAT)
+├── Relocation Table (.reloc)
+└── Debug Directory
 ```
 
-### Perbandingan Root Solutions
+#### 3. Runtime Loading Analysis
+```c
+// Linux/Android dynamic linking
+dlopen("libgame.so", RTLD_NOW);  // Load library
+dlsym(handle, "GameFunction");    // Resolve symbol
 
-| Solution | Level | Metode | Kelebihan |
-|----------|-------|--------|-----------|
-| **Magisk** | Framework | Binder IPC, resetprop | Mature, banyak module |
-| **KernelSU** | Kernel | KPM-based | Kernel-level stability |
-| **SukiSU-Ultra** | Kernel | KPM + SUSFS | Built-in root hiding |
-| **KernelPatch** | Kernel | Generic KPM | Flexible, APatch support |
-| **SuperSU** (legacy) | Userspace | su binary | Legacy compatibility |
+// Windows DLL loading
+LoadLibrary("game.dll");          // Load library
+GetProcAddress(handle, "GameFunction");  // Resolve symbol
+```
+
+#### 4. PLT/GOT Hooking Mechanism
+```
+PLT (Procedure Linkage Table):
+┌─────────────────────────────────────┐
+│ PLT Entry (lazy binding)            │
+│ jmp *GOT[offset]                    │
+│ → First call: resolver → GOT update │
+│ → Subsequent: direct to target      │
+└─────────────────────────────────────┘
+
+GOT (Global Offset Table):
+┌─────────────────────────────────────┐
+│ GOT Entry                          │
+│ Initially: points to PLT resolver  │
+│ After resolution: actual function   │
+└─────────────────────────────────────┘
+```
+
+### Contoh Hook Code
+
+#### PLT Hook (Linux/Android)
+```c
+#include <dlfcn.h>
+#include <elf.h>
+
+// Original function pointer
+int (*original_socket)(int, int, int) = NULL;
+
+// Hook function
+int hook_socket(int domain, int type, int protocol) {
+    printf("[HOOK] socket(%d, %d, %d)\n", domain, type, protocol);
+    return original_socket(domain, type, protocol);
+}
+
+// PLT hook via GOT overwrite
+void hook_plt() {
+    void *handle = dlopen("libgame.so", RTLD_NOW);
+    void *got_entry = dlsym(handle, "socket");
+    
+    // Save original
+    original_socket = (int(*)(int,int,int))got_entry;
+    
+    // Overwrite GOT entry
+    mprotect(got_page, 4096, PROT_READ | PROT_WRITE);
+    *(void**)got_entry = hook_socket;
+}
+```
+
+#### Inline Hook (ARM64)
+```asm
+// Original function prologue
+func:
+    sub sp, sp, #0x10    ; 4 bytes
+    stp x29, x30, [sp]   ; 8 bytes
+    ...
+
+// Patch: branch to hook
+func:
+    b hook_handler       ; 4 bytes (branch)
+    nop                  ; 4 bytes (padding)
+    nop                  ; 4 bytes (padding)
+    nop                  ; 4 bytes (padding)
+    nop                  ; 4 bytes (padding)
+    nop                  ; 4 bytes (padding)
+    nop                  ; 4 bytes (padding)
+    nop                  ; 4 bytes (padding)
+```
+
+### File Types untuk DLL Analysis
+
+| File Type | Extension | Engine | Fungsi |
+|-----------|-----------|--------|--------|
+| **Shared Object** | `.so` | UnityIL2CPP, UnityMono, Godot | Native library Android/Linux |
+| **PE Binary** | `.dll`, `.exe` | UnrealEngine, Source2 | Windows executable/library |
+| **IL2CPP Metadata** | `global-metadata.dat` | UnityIL2CPP | Type/method/string metadata |
+| **Unity Assets** | `.assets`, `.resource` | UnityMono | Serialized Unity objects |
+| **PAK File** | `.pak` | UnrealEngine | UE4/UE5 asset container |
+| **BSP File** | `.bsp` | Source2 | Source 2 map file |
+| **PCK File** | `.pck` | Godot | Godot packed resource |
+| **YYAML** | `.yy`, `.yydebug` | GameMaker | GameMaker project data |
+| **UNG File** | `.ung` | UnrealEngine | Unreal packaging format |
+
+### Implementasi di OmniByte
+
+```cpp
+// DumperCore/AnalysisTarget.h
+enum class TargetType {
+    File,       // .so, .dll, .apk, .pak, .win, .pck, .ung, .bsp
+    Process     // Live process via MemoryIO (ASLR-safe)
+};
+
+// IDumperEngine::detect() mengecek file type
+// Berdasarkan magic bytes dan extension
+DetectionResult detect(const AnalysisTarget& target) const;
+```
 
 ### Referensi
-- Weishu, "KernelSU: A Kernel-based root solution," https://github.com/tiann/KernelSU
-- bmax121, "KernelPatch," https://github.com/bmax121/KernelPatch
-- m0nad, "Diamorphine: LKM rootkit for Linux," https://github.com/m0nad/Diamorphine
+- ELF Specification, "System V Application Binary Interface," https://www.sco.com/developers/devspecs/abi386-4.pdf
+- Microsoft, "PE Format," https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
+- Eli Bendersky, "Linkers and Loaders," https://www.airs.com/blog/archives/38
+- xdl (Extended Dynamic Linker), https://github.com/hexhacking/xdl
 
 ---
 
@@ -1903,6 +2133,8 @@ public class ModMenuService extends Service {
 
 ### Workflow RE Lengkap (Updated)
 
+### Workflow RE Lengkap (Updated)
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    WORKFLOW REVERSE ENGINEERING                 │
@@ -1997,7 +2229,154 @@ Pemahaman terhadap workflow ini penting untuk pengembangan OmniByte:
 
 ---
 
-## 52. Daftar Pustaka & Sitasi
+## 52. Native Binary & Metadata File Types (Dumper/Engines/Profiles)
+
+### Daftar File Type Berdasarkan Engine
+
+### Daftar File Type Berdasarkan Engine
+
+#### 1. UnityIL2CPP Engine
+
+| File Type | Extension | Magic | Fungsi |
+|-----------|-----------|-------|--------|
+| **Native Binary** | `.so` | `0x7F454C46` (ELF) | libil2cpp.so — compiled C++ code |
+| **IL2CPP Metadata** | `global-metadata.dat` | `0xFAB11BAF` | Type definitions, method names, string literals |
+| **ARM64 Binary** | `.so` (arm64-v8a) | ELF header | Primary architecture for Android |
+| **ARM32 Binary** | `.so` (armeabi-v7a) | ELF header | Legacy 32-bit support |
+
+#### 2. UnityMono Engine
+
+| File Type | Extension | Magic | Fungsi |
+|-----------|-----------|-------|--------|
+| **Mono Runtime** | `.so` | `0x7F454C46` (ELF) | libmono.so / libmonobdwgc-*.so |
+| **Managed Assembly** | `.dll` | `0x4D5A9000` (PE) | Assembly-CSharp.dll, Managed DLLs |
+| **Mono Metadata** | `.dll` | PE header | Type/method metadata |
+
+#### 3. UnrealEngine
+
+| File Type | Extension | Magic | Fungsi |
+|-----------|-----------|-------|--------|
+| **UE4/UE5 Binary** | `.exe`, `.dll` | PE header | Main game executable |
+| **PAK File** | `.pak` | `0x4F65624D` | UE4/UE5 asset container |
+| **UASSET** | `.uasset` | `0xC1832A9E` | Serialized UE4/UE5 assets |
+| **UMAP** | `.umap` | `0x31415453` | Level/map data |
+| **UNG File** | `.ung` | Custom | Unreal packaging format |
+
+#### 4. Source2 Engine
+
+| File Type | Extension | Magic | Fungsi |
+|-----------|-----------|-------|--------|
+| **Source 2 Binary** | `.dll` | PE header | Game DLL (Windows) |
+| **VPK File** | `.vpk` | `0x474D5300` (V1), `0x55AA1234` (V2) | Valve Pak archive |
+| **BSP File** | `.bsp` | Source 2 magic | Compiled map file |
+| **VSVDF** | `.vsndf` | Custom | Sound file definitions |
+
+#### 5. Godot Engine
+
+| File Type | Extension | Magic | Fungsi |
+|-----------|-----------|-------|--------|
+| **GDNative Library** | `.so` | `0x7F454C46` (ELF) | Native script library |
+| **GDExtension** | `.so` | ELF header | Extension library |
+| **PCK File** | `.pck` | `0x47445043` (GDPC) | Godot packed resource |
+| **GDScript** | `.gd` | Text-based | Script files |
+
+#### 6. GameMaker Engine
+
+| File Type | Extension | Magic | Fungsi |
+|-----------|-----------|-------|--------|
+| **YY Executable** | `.exe` | PE header | Game executable |
+| **YY Data** | `.yy` | `0x5A4F4F43` (Zooc) | Project data |
+| **YY Debug** | `.yydebug` | Custom | Debug information |
+| **YY Broadcast** | `.yybroadcast` | Custom | Broadcast data |
+
+#### 7. Cocos2d Engine
+
+| File Type | Extension | Magic | Fungsi |
+|-----------|-----------|-------|--------|
+| **Native Library** | `.so` | `0x7F454C46` (ELF) | libcocos2d*.so |
+| **Lua Script** | `.luac` | `0x1B4C7561` | Compiled Lua bytecode |
+| **Plist** | `.plist` | `0x3C3F786D` | Property list (XML) |
+
+### Native Binary ELF Structure
+
+```
+ELF Header (64-bit)
+├── e_ident[16]: Magic + Class + Endianness + OS/ABI
+│   └── 0x7F 0x45 0x4C 0x46 = ".ELF"
+├── e_type: ET_EXEC (executable) / ET_DYN (shared object)
+├── e_machine: EM_AARCH64 (0xB7) / EM_ARM (0x28)
+├── e_entry: Entry point address
+├── e_phoff: Program header offset
+├── e_shoff: Section header offset
+├── e_flags: Processor-specific flags
+├── e_ehsize: ELF header size (64 bytes for ELF64)
+└── e_phnum/e_shnum: Number of headers
+
+Program Headers
+├── PT_LOAD: Loadable segment (code, data)
+├── PT_DYNAMIC: Dynamic linking info
+├── PT_INTERP: Path to interpreter (/system/bin/linker64)
+├── PT_GNU_STACK: Stack permissions
+└── PT_GNU_RELRO: Read-only after relocation
+
+Section Headers
+├── .text: Executable code
+├── .rodata: Read-only data (strings, constants)
+├── .data: Initialized global/static variables
+├── .bss: Uninitialized global/static variables
+├── .plt: Procedure Linkage Table (function calls)
+├── .got: Global Offset Table (address resolution)
+├── .dynsym: Dynamic symbol table
+├── .dynstr: Dynamic string table
+├── .rel.dyn/.rel.plt: Relocation entries
+└── .note.gnu.property: ABI flags (BTI, PAC)
+```
+
+### Metadata Validation Flow
+
+```
+Input File
+    │
+    ├── Read magic bytes (first 4-8 bytes)
+    │
+    ├── Compare against known magic
+    │   ├── 0x7F454C46 → ELF binary → Route to ELF parser
+    │   ├── 0xFAB11BAF → IL2CPP metadata → Route to IL2CPP dumper
+    │   ├── 0x4D5A9000 → PE binary → Route to PE parser
+    │   ├── 0x4F65624D → UE4 PAK → Route to PAK extractor
+    │   └── 0x47445043 → Godot PCK → Route to PCK extractor
+    │
+    ├── Validate header structure
+    │   ├── Check field values within expected ranges
+    │   └── Verify checksum if present
+    │
+    └── Select appropriate Engine + Profile
+        ├── Engine: UnityIL2CPP, UnrealEngine, Godot, etc.
+        └── Profile: Version-specific offsets (v27, v29, UE5.3, etc.)
+```
+
+### Implementasi di OmniByte
+
+```cpp
+// DumperCore/Detector — detectBestMatch()
+auto bestMatch = registry.detectBestMatch(target);
+
+// IDumperEngine::detect() checks:
+// 1. File extension (.so, .dll, .pak, etc.)
+// 2. Magic bytes (ELF, PE, IL2CPP metadata)
+// 3. Section names (.text, .il2cpp, .pdata)
+// 4. Symbol exports (il2cpp_codegen_*, gNames, etc.)
+
+// Confidence-based ranking:
+// 1.0 = Exact match (magic + version + symbols)
+// 0.8 = Strong match (magic + some symbols)
+// 0.6 = Weak match (file type only)
+// <0.5 = No match
+```
+
+---
+
+## 53. Daftar Pustaka & Sitasi
 
 ### Root Access & Kernel Patching
 1. ShirkNeko, "SukiSU-Ultra: Kernel-based Android Root Solution & KPM," GitHub, https://github.com/ShirkNeko/SukiSU-Ultra
