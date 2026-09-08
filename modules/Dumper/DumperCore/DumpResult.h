@@ -7,8 +7,8 @@
 #include <memory>
 
 // Include shared metadata types for full definitions
-#include "../../../engine-core/Shared/MetadataEntry.h"
-#include "../../../engine-core/Shared/IMetadataStore.h"
+#include "../../../engine-core/Shared/Metadata/MetadataEntry.h"
+#include "../../../engine-core/Shared/Metadata/IMetadataStore.h"
 
 namespace omnibyte::dumper {
 

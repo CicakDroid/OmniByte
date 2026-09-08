@@ -32,8 +32,8 @@
 #include <optional>
 
 // Include shared metadata types for full definitions
-#include "../../Shared/MetadataEntry.h"
-#include "../../Shared/IMetadataStore.h"
+#include "../../Shared/Metadata/MetadataEntry.h"
+#include "../../Shared/Metadata/IMetadataStore.h"
 
 // Include kontrak HydraDis — dibutuhkan oleh convenience accessors di PluginContext
 // yang perlu akses member ParsedBinary, DisassemblyResult, DecompiledFunction.
