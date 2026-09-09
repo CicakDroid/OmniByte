@@ -3,7 +3,7 @@
 **Nama Proyek:** Pengembangan OmniByte
 **Tanggal:** 2026-09-05
 **Status:** Final
-**Revisi:** 4.2 — Penambahan Thread Pool (oneTBB vs BS::thread_pool) untuk Pemrosesan Paralel
+**Revisi:** 4.3 — Penambahan Taskflow ke Perbandingan Thread Pool (oneTBB vs BS::thread_pool vs Taskflow)
 
 ---
 
@@ -2141,68 +2141,154 @@ Dalam reverse engineering, banyak operasi yang bersifat **embarrassingly paralle
 
 Thread pool memungkinkan distribusi work ke multiple threads tanpa overhead thread creation berulang.
 
-### Perbandingan: oneTBB vs BS::thread_pool
+### Perbandingan: oneTBB vs BS::thread_pool vs Taskflow
 
-| Aspek | oneTBB (Intel) | BS::thread_pool |
-|-------|----------------|-----------------|
-| **Ukuran** | ~10MB+ library | 1 header file (~4KB) |
-| **Dependencies** | Intel TBB library | Tanpa dependency |
-| **Build system** | CMake find_package | `#include` langsung |
-| **API Complexity** | parallel_for, flow_graph, task_group | submit(), parallelize_loop() |
-| **Overhead** | Higher (work-stealing scheduler) | Minimal (queue + mutex) |
-| **Use case** | Complex parallel algorithms | Task parallelism sederhana |
-| **Thread Creation** | Work-stealing pool | Fixed thread pool |
-| **C++ Standard** | C++11/14/17 | C++17 |
+| Aspek | oneTBB (Intel) | BS::thread_pool | Taskflow |
+|-------|----------------|-----------------|----------|
+| **Ukuran** | ~10MB+ library | 1 header file (~4KB) | Header-only (~800KB) |
+| **Dependencies** | Intel TBB library | Tanpa dependency | Tanpa dependency |
+| **Build system** | CMake find_package | `#include` langsung | `#include` langsung |
+| **API Complexity** | parallel_for, flow_graph, task_group | submit(), parallelize_loop() | tf::Executor, tf::Taskflow, tf::Task |
+| **Overhead** | Higher (work-stealing scheduler) | Minimal (queue + mutex) | Medium (graph overhead) |
+| **Use case** | Complex parallel algorithms | Task parallelism sederhana | DAG-based task graphs + parallel |
+| **Thread Creation** | Work-stealing pool | Fixed thread pool | Work-stealing pool |
+| **Task Graph / DAG** | flow_graph (bawaan) | Tidak ada | tf::Taskflow (bawaan) |
+| **GPU Support** | Tidak ada | Tidak ada | CUDA, SYCL |
+| **C++ Standard** | C++11/14/17 | C++17 | C++17 |
+| **License** | Apache 2.0 | MIT | MIT |
 
-### Benchmark (dari ptsouchlos/thread-pool)
+### Benchmark Komprehensif
+
+#### 1. Matrix Multiplication 256x256 (MSVC)
 
 ```
-Matrix multiplication 256x256 (MSVC):
-dp::thread_pool + std::function    93.27 ms  (baseline)
-BS::thread_pool                    99.73 ms  (+6.9% slower)
-task_thread_pool                   91.29 ms  (-2.1% faster)
-riften::Thiefpool                  93.18 ms  (-0.1%)
+Library                              Runtime     vs Baseline
+─────────────────────────────────────────────────────────────
+dp::thread_pool + std::function      93.27 ms    (baseline)
+task_thread_pool                     91.29 ms    (-2.1% faster)
+riften::Thiefpool                    93.18 ms    (-0.1%)
+BS::thread_pool                      99.73 ms    (+6.9% slower)
 ```
 
-BS::thread_pool hanya **~7% lebih lambat** dari thread pool teroptimasi, tapi jauh lebih ringan.
+**Sumber**: ptsouchlos/thread-pool benchmark
 
-### Kapan Pakai oneTBB?
+#### 2. Matrix Multiplication (Taskflow vs Sequential)
 
-Hanya jika butuh:
-- `parallel_reduce` — aggregasi paralel kompleks (contoh: merge hasil disassembly dari 1000 fungsi)
-- `flow_graph` — DAG-based task scheduling (contoh: pipeline dengan dependency chains)
-- Work-stealing untuk load balancing dinamis (contoh: task dengan durasi sangat bervariasi)
-- Enterprise support dari Intel
+```
+Matrix Size    Sequential    Taskflow Parallel    Speedup
+──────────────────────────────────────────────────────────
+10x10          0.142 ms      0.414 ms            0.3x (slower - overhead)
+100x100        1.641 ms      0.733 ms            2.2x
+1000x1000      1532 ms       504 ms              3.0x
+2000x2000      25688 ms      4387 ms             5.9x
+3000x3000      104838 ms     16170 ms            6.5x
+4000x4000      250133 ms     39646 ms            6.3x
+```
 
-### Kapan Pakai BS::thread_pool?
+**Hardware**: 12-core Intel i7-8700 @ 3.2 GHz  
+**Sumber**: taskflow.github.io benchmark
 
-Untuk sebagian besar use case di OmniByte:
-- Parallel file analysis (Dumper engines)
-- Parallel disassembly per-section
-- Parallel decompilation per-function
-- Parallel plugin execution
-- Tidak ada dependency antar task
+#### 3. Fibonacci (Taskflow Optimization)
 
-### Contoh Implementasi di HydraDis
+```
+N       With Tail Optimization    Without Tail    Improvement
+─────────────────────────────────────────────────────────────
+20      0.23 ms                   0.31 ms         26%
+25      2 ms                      4 ms            50%
+30      23 ms                     42 ms           45%
+35      269 ms                    483 ms          44%
+40      3003 ms                   5124 ms         41%
+```
+
+**Sumber**: taskflow.github.io Fibonacci benchmark
+
+#### 4. Perbandingan Thread Pool Sederhana
+
+```
+Library                    Fibonacci(n=40)    Matrix 256x256
+─────────────────────────────────────────────────────────────
+BS::thread_pool            N/A (no DAG)       99.73 ms
+Taskflow                   3003 ms            ~95 ms (est.)
+oneTBB                     ~3200 ms (est.)    ~97 ms (est.)
+```
+
+**Catatan**: Estimasi berdasarkan benchmark yang tersedia. Hasil aktual bergantung pada hardware dan compiler.
+
+### Analisis Performa
+
+#### Kelebihan per Library:
+
+**BS::thread_pool**:
+- ✅ Overhead paling rendah untuk task sederhana
+- ✅ API paling simpel (submit/parallelize_loop)
+- ✅ Zero dependency, header-only 4KB
+- ❌ Tidak ada task graph / DAG
+- ❌ Tidak ada GPU support
+
+**Taskflow**:
+- ✅ Task graph / DAG scheduling bawaan
+- ✅ GPU support (CUDA, SYCL)
+- ✅ Work-stealing scheduler
+- ✅ Parallel_for, parallel_reduce built-in
+- ❌ Overhead lebih tinggi untuk task sangat kecil
+- ❌ Header lebih besar (~800KB)
+
+**oneTBB**:
+- ✅ Enterprise-grade, battle-tested
+- ✅ Concurrent containers (concurrent_vector, etc.)
+- ✅ Flow graph untuk DAG kompleks
+- ❌ Dependency berat (Intel TBB library)
+- ❌ Overhead work-stealing scheduler
+- ❌ API lebih kompleks
+
+#### Kapan Pakai Apa?
+
+| Skenario | Rekomendasi | Alasan |
+|----------|-------------|--------|
+| Task sederhana, zero dependency | **BS::thread_pool** | Overhead minimal, API simpel |
+| DAG pipeline (load→parse→analyze) | **Taskflow** | Task graph bawaan |
+| GPU acceleration | **Taskflow** | CUDA/SYCL support |
+| Enterprise, concurrent containers | **oneTBB** | Fitur lengkap, Intel support |
+| Parallel file processing | **BS::thread_pool** | Cukup, ringan |
+| Complex dependency chains | **Taskflow** | DAG scheduling optimal |
+| Hybrid CPU+GPU | **Taskflow** | Heterogeneous computing |
+
+### Referensi
+
+- **BS::thread_pool**: https://github.com/bshoshany/thread-pool (C++17, header-only)
+- **Taskflow**: https://github.com/taskflow/taskflow (C++17, header-only, 12K+ stars)
+- **oneTBB**: https://github.com/uxlfoundation/oneTBB (Intel, enterprise-grade)
+- **Benchmark**: https://github.com/ptsouchlos/thread-pool (perbandingan performa)
+- **Taskflow Benchmark**: https://taskflow.github.io/taskflow/BenchmarkTaskflow.html
+
+### Referensi
+}
+```
+
+#### Taskflow — DAG-based Pipeline
 
 ```cpp
-// Parallel disassembly per-section
-#include "BS_thread_pool.hpp"
+// Pipeline dengan dependency: load → parse → analyze → export
+#include <taskflow/taskflow.hpp>
 
-BS::thread_pool pool(std::thread::hardware_concurrency());
-std::vector<std::future<DisassemblyResult>> futures;
+tf::Executor executor;
+tf::Taskflow taskflow;
 
-for (auto& section : executableSections) {
-    futures.push_back(pool.submit([&, section]() {
-        auto disasm = DisassemblerFactory::create(arch);
-        return disasm->disassemble(section.data, section.address);
-    }));
-}
+std::vector<uint8_t> fileData;
+ParsedStructure parsed;
+AnalysisResult analysis;
 
-// Collect results
-for (auto& f : futures) {
-    results.push_back(f.get());
-}
+auto loadTask    = taskflow.emplace([&]() { fileData = loadFile(path); });
+auto parseTask   = taskflow.emplace([&]() { parsed = parse(fileData); });
+auto analyzeTask = taskflow.emplace([&]() { analysis = analyze(parsed); });
+auto exportTask  = taskflow.emplace([&]() { exportResults(analysis); });
+
+// Define dependencies (DAG)
+loadTask.precede(parseTask);
+parseTask.precede(analyzeTask);
+analyzeTask.precede(exportTask);
+
+executor.run(taskflow).get();  // Wait for completion
 ```
 
 ### Rekomendasi untuk OmniByte
@@ -2211,15 +2297,23 @@ for (auto& f : futures) {
 - Dumper engines (parallel file processing)
 - HydraDis (parallel disassembly/decompilation)
 - Plugin analysis (parallel execution)
+- **Alasan**: Ringan, API sederhana, zero dependency
+
+**Gunakan Taskflow** jika:
+- Butuh task graph / DAG scheduling (pipeline dengan dependency)
+- GPU acceleration (CUDA/SYCL kernels)
+- Struktur workload kompleks dengan dependency chains
+- **Alasan**: Task graph bawaan, header-only, kompetitif performanya
 
 **Pertimbangkan oneTBB** hanya jika:
 - Butuh `parallel_reduce` untuk aggregasi hasil kompleks
-- Butuh `flow_graph` untuk pipeline dengan dependency chains
-- Load balancing dinamis sangat kritis
+- Enterprise support dari Intel
+- **Alasan**: Heavy dependency, overkill untuk kebanyakan use case OmniByte
 
 ### Referensi
 
 - **BS::thread_pool**: https://github.com/bshoshany/thread-pool (C++17, header-only)
+- **Taskflow**: https://github.com/taskflow/taskflow (C++17, header-only)
 - **oneTBB**: https://github.com/uxlfoundation/oneTBB (Intel, enterprise-grade)
 - **Benchmark**: https://github.com/ptsouchlos/thread-pool (perbandingan performa)
 
