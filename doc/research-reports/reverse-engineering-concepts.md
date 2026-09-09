@@ -3,7 +3,7 @@
 **Nama Proyek:** Pengembangan OmniByte
 **Tanggal:** 2026-09-05
 **Status:** Final
-**Revisi:** 4.1 — Penambahan SukiSU-Ultra (segmentasi), Libsu (segmentasi), DLL (segmentasi + metode), Dumper/Engines/Profiles File Types
+**Revisi:** 4.2 — Penambahan Thread Pool (oneTBB vs BS::thread_pool) untuk Pemrosesan Paralel
 
 ---
 
@@ -79,10 +79,10 @@
 48. [Hook Code Generation](#48-hook-code-generation)
 49. [Target Fungsi dalam Game](#49-target-fungsi-dalam-game)
 50. [Mod Menu Implementation Flow](#50-mod-menu-implementation-flow)
-
-51. [Kesimpulan & Relevansi untuk OmniByte](#51-kesimpulan--relevansi-untuk-omnibyte)
-52. [Native Binary & Metadata File Types (Dumper/Engines/Profiles)](#52-native-binary--metadata-file-types-dumperenginesprofiles)
-53. [Daftar Pustaka & Sitasi](#53-daftar-pustaka--situsi)
+51. [Thread Pool untuk Pemrosesan Paralel](#51-thread-pool-untuk-pemrosesan-paralel)
+52. [Kesimpulan & Relevansi untuk OmniByte](#52-kesimpulan--relevansi-untuk-omnibyte)
+53. [Native Binary & Metadata File Types (Dumper/Engines/Profiles)](#53-native-binary--metadata-file-types-dumperenginesprofiles)
+54. [Daftar Pustaka & Sitasi](#54-daftar-pustaka--situsi)
 
 ---
 
@@ -2129,9 +2129,103 @@ public class ModMenuService extends Service {
 
 ---
 
-## 51. Kesimpulan & Relevansi untuk OmniByte
+## 51. Thread Pool untuk Pemrosesan Paralel
 
-### Workflow RE Lengkap (Updated)
+### Mengapa Thread Pool?
+
+Dalam reverse engineering, banyak operasi yang bersifat **embarrassingly parallel** — setiap task independen dan tidak ada dependency antar satu sama lain. Contoh:
+- Parallel disassembly per-section
+- Parallel decompile per-function
+- Parallel plugin analysis
+- Parallel file processing (Dumper)
+
+Thread pool memungkinkan distribusi work ke multiple threads tanpa overhead thread creation berulang.
+
+### Perbandingan: oneTBB vs BS::thread_pool
+
+| Aspek | oneTBB (Intel) | BS::thread_pool |
+|-------|----------------|-----------------|
+| **Ukuran** | ~10MB+ library | 1 header file (~4KB) |
+| **Dependencies** | Intel TBB library | Tanpa dependency |
+| **Build system** | CMake find_package | `#include` langsung |
+| **API Complexity** | parallel_for, flow_graph, task_group | submit(), parallelize_loop() |
+| **Overhead** | Higher (work-stealing scheduler) | Minimal (queue + mutex) |
+| **Use case** | Complex parallel algorithms | Task parallelism sederhana |
+| **Thread Creation** | Work-stealing pool | Fixed thread pool |
+| **C++ Standard** | C++11/14/17 | C++17 |
+
+### Benchmark (dari ptsouchlos/thread-pool)
+
+```
+Matrix multiplication 256x256 (MSVC):
+dp::thread_pool + std::function    93.27 ms  (baseline)
+BS::thread_pool                    99.73 ms  (+6.9% slower)
+task_thread_pool                   91.29 ms  (-2.1% faster)
+riften::Thiefpool                  93.18 ms  (-0.1%)
+```
+
+BS::thread_pool hanya **~7% lebih lambat** dari thread pool teroptimasi, tapi jauh lebih ringan.
+
+### Kapan Pakai oneTBB?
+
+Hanya jika butuh:
+- `parallel_reduce` — aggregasi paralel kompleks (contoh: merge hasil disassembly dari 1000 fungsi)
+- `flow_graph` — DAG-based task scheduling (contoh: pipeline dengan dependency chains)
+- Work-stealing untuk load balancing dinamis (contoh: task dengan durasi sangat bervariasi)
+- Enterprise support dari Intel
+
+### Kapan Pakai BS::thread_pool?
+
+Untuk sebagian besar use case di OmniByte:
+- Parallel file analysis (Dumper engines)
+- Parallel disassembly per-section
+- Parallel decompilation per-function
+- Parallel plugin execution
+- Tidak ada dependency antar task
+
+### Contoh Implementasi di HydraDis
+
+```cpp
+// Parallel disassembly per-section
+#include "BS_thread_pool.hpp"
+
+BS::thread_pool pool(std::thread::hardware_concurrency());
+std::vector<std::future<DisassemblyResult>> futures;
+
+for (auto& section : executableSections) {
+    futures.push_back(pool.submit([&, section]() {
+        auto disasm = DisassemblerFactory::create(arch);
+        return disasm->disassemble(section.data, section.address);
+    }));
+}
+
+// Collect results
+for (auto& f : futures) {
+    results.push_back(f.get());
+}
+```
+
+### Rekomendasi untuk OmniByte
+
+**Gunakan BS::thread_pool** untuk:
+- Dumper engines (parallel file processing)
+- HydraDis (parallel disassembly/decompilation)
+- Plugin analysis (parallel execution)
+
+**Pertimbangkan oneTBB** hanya jika:
+- Butuh `parallel_reduce` untuk aggregasi hasil kompleks
+- Butuh `flow_graph` untuk pipeline dengan dependency chains
+- Load balancing dinamis sangat kritis
+
+### Referensi
+
+- **BS::thread_pool**: https://github.com/bshoshany/thread-pool (C++17, header-only)
+- **oneTBB**: https://github.com/uxlfoundation/oneTBB (Intel, enterprise-grade)
+- **Benchmark**: https://github.com/ptsouchlos/thread-pool (perbandingan performa)
+
+---
+
+## 52. Kesimpulan & Relevansi untuk OmniByte
 
 ### Workflow RE Lengkap (Updated)
 
@@ -2229,7 +2323,7 @@ Pemahaman terhadap workflow ini penting untuk pengembangan OmniByte:
 
 ---
 
-## 52. Native Binary & Metadata File Types (Dumper/Engines/Profiles)
+## 53. Native Binary & Metadata File Types (Dumper/Engines/Profiles)
 
 ### Daftar File Type Berdasarkan Engine
 
@@ -2376,7 +2470,7 @@ auto bestMatch = registry.detectBestMatch(target);
 
 ---
 
-## 53. Daftar Pustaka & Sitasi
+## 54. Daftar Pustaka & Sitasi
 
 ### Root Access & Kernel Patching
 1. ShirkNeko, "SukiSU-Ultra: Kernel-based Android Root Solution & KPM," GitHub, https://github.com/ShirkNeko/SukiSU-Ultra
