@@ -36,7 +36,7 @@ public:
             std::memcpy(&magic, data.data(), 4);
 
             // Direct magic match
-            if (magic == 0xAF1BBA00) {
+            if (magic == 0xFAB11BAF) {
                 uint32_t ver;
                 std::memcpy(&ver, data.data() + 4, 4);
                 r.matched = true;

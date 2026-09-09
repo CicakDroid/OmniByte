@@ -51,7 +51,7 @@ public:
         std::memcpy(&magic, headerBytes, 4);
         uint32_t ver;
         std::memcpy(&ver, headerBytes + 4, 4);
-        return magic == 0xAF1BBA00 && ver == 24;
+        return magic == 0xFAB11BAF && ver == 24;
     }
 };
 

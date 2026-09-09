@@ -53,7 +53,7 @@ public:
         if (magic != kIl2CppMagic) {
             // Try decryption (adapted from il2cpp-dumper-rs try_decrypt_metadata).
             if (!tryDecryptMetadata(fileData)) {
-                result.errorMessage = "Invalid IL2CPP metadata magic (expected 0xAF1BB1FA). "
+                result.errorMessage = "Invalid IL2CPP metadata magic (expected 0xFAB11BAF). "
                                       "File may be encrypted.";
                 return result;
             }
@@ -77,7 +77,7 @@ public:
     }
 
 private:
-    static const uint32_t kIl2CppMagic = 0xAF1BBA00; // v24+ magic
+    static const uint32_t kIl2CppMagic = 0xFAB11BAF; // v24+ global-metadata.dat magic
 
     static uint32_t readU32(const std::vector<uint8_t>& buf, size_t off) {
         if (off + 4 > buf.size()) return 0;
@@ -99,8 +99,7 @@ private:
     static bool tryDecryptMetadata(std::vector<uint8_t>& data) {
         if (data.size() < 16) return false;
 
-        const uint8_t magic[] = { 0xAF, 0xBA, 0xB1, 0xFA }; // little-endian 0xFAB11BAF
-        const uint8_t target[] = { 0x00, 0xBA, 0xB1, 0xFA }; // our expected magic bytes
+        const uint8_t target[] = { 0xAF, 0x1B, 0xB1, 0xFA }; // LE bytes of 0xFAB11BAF
 
         // Single-byte XOR
         {
@@ -127,8 +126,6 @@ private:
                 std::vector<uint8_t> test(data.begin(), data.end());
                 for (size_t i = 0; i < test.size(); ++i) test[i] ^= key4[i % 4];
                 if (isValidMetadataVersion(test)) {
-                    for (auto& b : data) b ^= key4[&b - data.data()]; // wrong
-                    // Fix: proper 4-byte loop
                     for (size_t i = 0; i < data.size(); ++i) data[i] ^= key4[i % 4];
                     return true;
                 }
