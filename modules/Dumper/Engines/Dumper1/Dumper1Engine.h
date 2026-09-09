@@ -7,6 +7,9 @@
 #include "../../DumperCore/IEngineProfile.h"
 #include "Analyzer/Dumper1Analyzer.h"
 #include "Resolver/Dumper1Resolver.h"
+#include "Output/DumpCsWriter.h"
+#include "Output/StructGenerator.h"
+#include "Output/StaticFieldExporter.h"
 #include "Profiles/V24Profile.h"
 #include "Profiles/V27Profile.h"
 #include "Profiles/V29Profile.h"
@@ -14,6 +17,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <fstream>
 
 namespace omnibyte::dumper::dumper1 {
 
@@ -91,7 +95,13 @@ public:
 
     DumpData analyze(const AnalysisTarget& target,
                         const std::shared_ptr<IEngineProfile>& profile) override {
-        return Dumper1Analyzer::analyze(target, profile);
+        DumpData result = Dumper1Analyzer::analyze(target, profile);
+
+        if (result.success && !target.filePath.empty()) {
+            generateOutput(result, target.filePath);
+        }
+
+        return result;
     }
 
     DumpData resolveSymbols(const AnalysisTarget& target,
@@ -129,6 +139,20 @@ public:
     }
 
 private:
+    static void generateOutput(const DumpData& data, const std::string& inputPath) {
+        std::string basePath = inputPath;
+        auto lastSlash = basePath.find_last_of("/\\");
+        if (lastSlash != std::string::npos) {
+            basePath = basePath.substr(0, lastSlash + 1);
+        } else {
+            basePath = "";
+        }
+
+        DumpCsWriter::writeFile(data, basePath + "dump.cs");
+        StructGenerator::writeFile(data, basePath + "struct_dump.cs");
+        StaticFieldExporter::writeFile(data, basePath + "static_fields.txt");
+    }
+
     static std::string toHex(uint64_t val) {
         if (val == 0) return "0";
         char buf[32];

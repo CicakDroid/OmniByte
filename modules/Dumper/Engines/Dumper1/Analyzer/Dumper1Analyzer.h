@@ -1,7 +1,7 @@
 #pragma once
 // Dumper1 — IL2CPP metadata parser (adapted from il2cpp-dumper-rs).
 // Parses global-metadata.dat with XOR decryption, extracts TypeDefs, MethodDefs,
-// FieldDefs, and string literals. No live process required.
+// FieldDefs, and string literals. Resolves names via string data blob lookup.
 #include "../../../DumperCore/IDumperEngine.h"
 #include "../../../DumperCore/IEngineProfile.h"
 #include "../../../DumperCore/SharedUtils/SharedUtils.h"
@@ -16,7 +16,6 @@ namespace omnibyte::dumper::dumper1 {
 
 class Dumper1Analyzer {
 public:
-    // Callback for progress updates during long operations.
     using ProgressCallback = std::function<void(const std::string&)>;
 
     static DumpData analyze(const AnalysisTarget& target,
@@ -42,7 +41,7 @@ public:
             return result;
         }
 
-        if (fileData.size() < 16) {
+        if (fileData.size() < 64) {
             result.errorMessage = "File too small to be IL2CPP metadata";
             return result;
         }
@@ -51,7 +50,6 @@ public:
 
         uint32_t magic = readU32(fileData, 0);
         if (magic != kIl2CppMagic) {
-            // Try decryption (adapted from il2cpp-dumper-rs try_decrypt_metadata).
             if (!tryDecryptMetadata(fileData)) {
                 result.errorMessage = "Invalid IL2CPP metadata magic (expected 0xFAB11BAF). "
                                       "File may be encrypted.";
@@ -65,7 +63,6 @@ public:
 
         if (progress) progress("Parsing metadata structures...");
 
-        // Parse metadata using profile offsets.
         parseMetadata(fileData, profile, result, progress);
 
         result.setMeta("typeCount", std::to_string(result.typeTable.size()));
@@ -77,7 +74,7 @@ public:
     }
 
 private:
-    static const uint32_t kIl2CppMagic = 0xFAB11BAF; // v24+ global-metadata.dat magic
+    static const uint32_t kIl2CppMagic = 0xFAB11BAF;
 
     static uint32_t readU32(const std::vector<uint8_t>& buf, size_t off) {
         if (off + 4 > buf.size()) return 0;
@@ -86,20 +83,24 @@ private:
         return v;
     }
 
-    static uint16_t readU16(const std::vector<uint8_t>& buf, size_t off) {
-        if (off + 2 > buf.size()) return 0;
-        uint16_t v;
-        std::memcpy(&v, buf.data() + off, 2);
-        return v;
+    // ── Read a length-prefixed UTF-8 string from the data blob ──
+    // IL2CPP string data format: 4-byte LE length, then that many bytes.
+    // nameIndex is a byte offset into the string data region.
+    static std::string readNameFromData(const std::vector<uint8_t>& data,
+                                         size_t dataRegionStart, uint32_t nameIndex) {
+        size_t pos = dataRegionStart + static_cast<size_t>(nameIndex);
+        if (pos + 4 > data.size()) return "";
+        uint32_t len = readU32(data, pos);
+        pos += 4;
+        if (pos + len > data.size() || len > 1024 * 1024) return ""; // sanity check: 1MB max
+        return std::string(reinterpret_cast<const char*>(data.data() + pos), len);
     }
 
     // ── XOR Decryption (from il2cpp-dumper-rs try_decrypt_metadata) ──
-    // Attempts single-byte, 4-byte, 8-byte, rolling, position-dependent, masked,
-    // and header-only XOR schemes against the metadata.
     static bool tryDecryptMetadata(std::vector<uint8_t>& data) {
         if (data.size() < 16) return false;
 
-        const uint8_t target[] = { 0xAF, 0x1B, 0xB1, 0xFA }; // LE bytes of 0xFAB11BAF
+        const uint8_t target[] = { 0xAF, 0x1B, 0xB1, 0xFA };
 
         // Single-byte XOR
         {
@@ -219,77 +220,117 @@ private:
     }
 
     // ── Metadata Parsing ──
+    // profile->offsetOf() returns HEADER FIELD POSITIONS (where the value is stored).
+    // We must read the uint32_t AT those positions to get the actual data offsets/counts.
     static void parseMetadata(const std::vector<uint8_t>& data,
                               const std::shared_ptr<IEngineProfile>& profile,
                               DumpData& result,
                               ProgressCallback progress) {
-        size_t typeDefOffset = static_cast<size_t>(profile->offsetOf("typeDefinitionsOffset"));
-        uint32_t typeDefCount = static_cast<uint32_t>(profile->offsetOf("typeDefinitionCount"));
-        size_t methodDefOffset = static_cast<size_t>(profile->offsetOf("methodDefinitionOffset"));
-        uint32_t methodDefCount = static_cast<uint32_t>(profile->offsetOf("methodDefinitionCount"));
-        size_t fieldDefOffset = static_cast<size_t>(profile->offsetOf("fieldDefinitionOffset"));
-        uint32_t fieldDefCount = static_cast<uint32_t>(profile->offsetOf("fieldDefinitionCount"));
-        size_t stringLiteralOffset = static_cast<size_t>(profile->offsetOf("stringLiteralOffset"));
-        size_t stringLiteralDataOffset = static_cast<size_t>(profile->offsetOf("stringLiteralDataOffset"));
+        // Read actual offsets and counts from metadata header.
+        // profile->offsetOf() gives us the header byte positions.
+        size_t typeDefFileOffset = static_cast<size_t>(
+            readU32(data, profile->offsetOf("typeDefinitionsOffset")));
+        uint32_t typeDefCount = readU32(data, profile->offsetOf("typeDefinitionCount"));
+        size_t methodDefFileOffset = static_cast<size_t>(
+            readU32(data, profile->offsetOf("methodDefinitionOffset")));
+        uint32_t methodDefCount = readU32(data, profile->offsetOf("methodDefinitionCount"));
+        size_t fieldDefFileOffset = static_cast<size_t>(
+            readU32(data, profile->offsetOf("fieldDefinitionOffset")));
+        uint32_t fieldDefCount = readU32(data, profile->offsetOf("fieldDefinitionCount"));
+        size_t stringLiteralFileOffset = static_cast<size_t>(
+            readU32(data, profile->offsetOf("stringLiteralOffset")));
+        size_t stringLiteralDataFileOffset = static_cast<size_t>(
+            readU32(data, profile->offsetOf("stringLiteralDataOffset")));
 
         size_t typeDefStructSize = profile->structSize("Il2CppTypeDefinition");
         size_t methodDefStructSize = profile->structSize("Il2CppMethodDefinition");
         size_t fieldDefStructSize = profile->structSize("Il2CppFieldDefinition");
 
+        // Parse string literals first (needed for name resolution).
+        if (progress) progress("Parsing string literals...");
+        if (stringLiteralFileOffset > 0 && stringLiteralDataFileOffset > 0) {
+            parseStringLiterals(data, stringLiteralFileOffset,
+                                stringLiteralDataFileOffset, result);
+        }
+
+        // Parse type/method/field definitions with name resolution via string data.
         if (progress) progress("Parsing type definitions...");
-        if (typeDefOffset > 0 && typeDefCount > 0 && typeDefStructSize > 0) {
-            parseTypeDefinitions(data, typeDefOffset, typeDefCount, typeDefStructSize, result);
+        if (typeDefFileOffset > 0 && typeDefCount > 0 && typeDefStructSize > 0) {
+            parseTypeDefinitions(data, typeDefFileOffset, typeDefCount,
+                                 typeDefStructSize, stringLiteralDataFileOffset, result);
         }
 
         if (progress) progress("Parsing method definitions...");
-        if (methodDefOffset > 0 && methodDefCount > 0 && methodDefStructSize > 0) {
-            parseMethodDefinitions(data, methodDefOffset, methodDefCount, methodDefStructSize, result);
+        if (methodDefFileOffset > 0 && methodDefCount > 0 && methodDefStructSize > 0) {
+            parseMethodDefinitions(data, methodDefFileOffset, methodDefCount,
+                                   methodDefStructSize, stringLiteralDataFileOffset, result);
         }
 
         if (progress) progress("Parsing field definitions...");
-        if (fieldDefOffset > 0 && fieldDefCount > 0 && fieldDefStructSize > 0) {
-            parseFieldDefinitions(data, fieldDefOffset, fieldDefCount, fieldDefStructSize, result);
+        if (fieldDefFileOffset > 0 && fieldDefCount > 0 && fieldDefStructSize > 0) {
+            parseFieldDefinitions(data, fieldDefFileOffset, fieldDefCount,
+                                  fieldDefStructSize, stringLiteralDataFileOffset, result);
         }
 
-        if (progress) progress("Parsing string literals...");
-        if (stringLiteralOffset > 0 && stringLiteralDataOffset > 0) {
-            parseStringLiterals(data, stringLiteralOffset, stringLiteralDataOffset, result);
-        }
+        // Resolve method declaring types now that typeTable is populated.
+        resolveMethodDeclaringTypes(result);
+        resolveFieldDeclaringTypes(result);
     }
 
+    // Parse TypeDefinitions. nameIndex is at offset 0x00 in each struct entry.
     static void parseTypeDefinitions(const std::vector<uint8_t>& data,
-                                      size_t offset, uint32_t count,
-                                      size_t structSize, DumpData& result) {
+                                       size_t offset, uint32_t count,
+                                       size_t structSize, size_t stringDataOffset,
+                                       DumpData& result) {
         for (uint32_t i = 0; i < count; ++i) {
             size_t entryOff = offset + (i * structSize);
             if (entryOff + structSize > data.size()) break;
 
             TypeEntry type;
             type.typeId = i;
-            type.name = "Type_" + std::to_string(i);
             type.address = entryOff;
 
-            if (structSize >= 0x24) {
-                uint16_t methodCount = static_cast<uint16_t>(
-                    readU32(data, entryOff + 0x22) & 0xFFFF);
-                type.size = methodCount;
+            // nameIndex at offset 0x00 — resolve from string data blob.
+            uint32_t nameIndex = readU32(data, entryOff);
+            type.name = readNameFromData(data, stringDataOffset, nameIndex);
+            if (type.name.empty()) {
+                type.name = "Type_" + std::to_string(i);
+            }
+
+            // namespaceIndex at offset 0x04 (not stored in TypeEntry, but could be used later).
+            // parentIndex at offset 0x14 (v24): index into TypeDef table.
+            if (structSize >= 0x18) {
+                uint32_t parentIdx = readU32(data, entryOff + 0x14);
+                if (parentIdx < count) {
+                    // Will be resolved in a second pass if needed.
+                    type.parentType = "Type_" + std::to_string(parentIdx);
+                }
             }
 
             result.typeTable.push_back(type);
         }
     }
 
+    // Parse MethodDefinitions. nameIndex at 0x00, declaringTypeIndex at 0x04.
     static void parseMethodDefinitions(const std::vector<uint8_t>& data,
-                                        size_t offset, uint32_t count,
-                                        size_t structSize, DumpData& result) {
+                                         size_t offset, uint32_t count,
+                                         size_t structSize, size_t stringDataOffset,
+                                         DumpData& result) {
         for (uint32_t i = 0; i < count; ++i) {
             size_t entryOff = offset + (i * structSize);
             if (entryOff + structSize > data.size()) break;
 
             MethodEntry method;
             method.methodIndex = i;
-            method.name = "Method_" + std::to_string(i);
 
+            // nameIndex at offset 0x00 — resolve from string data blob.
+            uint32_t nameIndex = readU32(data, entryOff);
+            method.name = readNameFromData(data, stringDataOffset, nameIndex);
+            if (method.name.empty()) {
+                method.name = "Method_" + std::to_string(i);
+            }
+
+            // declaringTypeIndex at offset 0x04 (index into TypeDef table).
             uint32_t declaringTypeIndex = readU32(data, entryOff + 0x04);
             method.declaringType = "Type_" + std::to_string(declaringTypeIndex);
 
@@ -297,16 +338,26 @@ private:
         }
     }
 
+    // Parse FieldDefinitions. nameIndex at 0x00, typeIndex at 0x04, parentIndex at 0x08.
     static void parseFieldDefinitions(const std::vector<uint8_t>& data,
-                                       size_t offset, uint32_t count,
-                                       size_t structSize, DumpData& result) {
+                                        size_t offset, uint32_t count,
+                                        size_t structSize, size_t stringDataOffset,
+                                        DumpData& result) {
         for (uint32_t i = 0; i < count; ++i) {
             size_t entryOff = offset + (i * structSize);
             if (entryOff + structSize > data.size()) break;
 
             FieldEntry field;
-            field.name = "Field_" + std::to_string(i);
 
+            // nameIndex at offset 0x00 — resolve from string data blob.
+            uint32_t nameIndex = readU32(data, entryOff);
+            field.name = readNameFromData(data, stringDataOffset, nameIndex);
+            if (field.name.empty()) {
+                field.name = "Field_" + std::to_string(i);
+            }
+
+            // typeIndex at offset 0x04 (index into TypeDef/encoded type).
+            // parentIndex at offset 0x08 (index into TypeDef table).
             uint32_t parentIndex = readU32(data, entryOff + 0x08);
             field.declaringType = "Type_" + std::to_string(parentIndex);
 
@@ -314,6 +365,8 @@ private:
         }
     }
 
+    // Parse string literal table: Il2CppStringLiteral entries {index, length}.
+    // The index is a byte offset into the string data region at stringLiteralDataOffset.
     static void parseStringLiterals(const std::vector<uint8_t>& data,
                                      size_t tableOffset, size_t dataOffset,
                                      DumpData& result) {
@@ -328,15 +381,44 @@ private:
             pos += 8;
 
             StringEntry entry;
-            entry.address = dataOffset + dataIdx;
-
             size_t strAbsOffset = dataOffset + dataIdx;
-            if (strAbsOffset + length <= data.size()) {
+            entry.address = strAbsOffset;
+
+            if (strAbsOffset + length <= data.size() && length < 1024 * 1024) {
                 entry.value = std::string(
                     reinterpret_cast<const char*>(data.data() + strAbsOffset), length);
             }
 
             result.stringTable.push_back(entry);
+        }
+    }
+
+    // Resolve method declaring types using the populated typeTable.
+    static void resolveMethodDeclaringTypes(DumpData& result) {
+        for (auto& method : result.methodTable) {
+            // declaringType is "Type_N" where N is the index. Look up real name.
+            uint32_t idx = 0;
+            const std::string& dt = method.declaringType;
+            if (dt.size() > 5 && dt.compare(0, 5, "Type_") == 0) {
+                idx = static_cast<uint32_t>(std::stoul(dt.substr(5)));
+            }
+            if (idx < result.typeTable.size()) {
+                method.declaringType = result.typeTable[idx].name;
+            }
+        }
+    }
+
+    // Resolve field declaring types using the populated typeTable.
+    static void resolveFieldDeclaringTypes(DumpData& result) {
+        for (auto& field : result.fieldTable) {
+            uint32_t idx = 0;
+            const std::string& dt = field.declaringType;
+            if (dt.size() > 5 && dt.compare(0, 5, "Type_") == 0) {
+                idx = static_cast<uint32_t>(std::stoul(dt.substr(5)));
+            }
+            if (idx < result.typeTable.size()) {
+                field.declaringType = result.typeTable[idx].name;
+            }
         }
     }
 };

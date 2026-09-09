@@ -9,4 +9,5 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(Analyzer)
 add_subdirectory(Resolver)
+add_subdirectory(Output)
 add_subdirectory(Profiles)
