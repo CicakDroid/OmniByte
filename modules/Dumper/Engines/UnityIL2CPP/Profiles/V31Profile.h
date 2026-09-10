@@ -103,6 +103,7 @@ public:
             {"Il2CppAssemblyDefinition", 0x44}, // same as v27/v29
             {"Il2CppAssemblyNameDefinition", 0x30}, // same as v27/v29
             {"Il2CppCustomAttributeDataRange", 0x08}, // same as v29
+            {"Il2CppStringLiteral", 0x10}, // token + dataIndex
         };
         auto it = kSizes.find(key);
         return it != kSizes.end() ? it->second : 0;

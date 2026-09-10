@@ -109,6 +109,7 @@ public:
             {"Il2CppAssemblyDefinition", 0x44}, // same as v27
             {"Il2CppAssemblyNameDefinition", 0x30}, // same as v27 (no hashValueIndex)
             {"Il2CppCustomAttributeDataRange", 0x08}, // NEW: token + startOffset
+            {"Il2CppStringLiteral", 0x10}, // token + dataIndex
         };
         auto it = kSizes.find(key);
         return it != kSizes.end() ? it->second : 0;
