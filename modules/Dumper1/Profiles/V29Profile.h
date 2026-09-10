@@ -1,8 +1,8 @@
 #pragma once
-// Dumper1 — IL2CPP v31 profile (Unity 2022.2+ / Unity 6000.x).
+// Dumper1 — IL2CPP v29 profile (Unity 2021.2+).
 // Source: il2cpp-dumper-rs metadata.rs + Perfare/Il2CppDumper MetadataClass.cs
-// Header: SAME layout as V29; struct differences in Il2CppMethodDefinition (adds returnParameterToken)
-#include "../../../DumperCore/IEngineProfile.h"
+// Header: DIFFERENT from V27 — attributesInfo removed, attributeData added
+#include "../../Dumper/DumperCore/IEngineProfile.h"
 #include <string>
 #include <cstdint>
 #include <cstring>
@@ -11,12 +11,12 @@
 
 namespace omnibyte::dumper::dumper1 {
 
-class V31Profile : public IEngineProfile {
+class V29Profile : public IEngineProfile {
 public:
-    std::string version() const override { return "31"; }
+    std::string version() const override { return "29"; }
 
     uint64_t offsetOf(const std::string& key) const override {
-        // IDENTICAL header layout to V29
+        // V29 header: no attributesInfo (Max=27.2), has attributeData (Min=29)
         // Source: il2cpp-dumper-rs metadata.rs + Il2CppDumper MetadataClass.cs
         static const std::unordered_map<std::string, uint64_t> kOffsets = {
             {"sanity",                            0x00},
@@ -61,6 +61,7 @@ public:
             {"interfaceOffsetsSize",              0x9C},
             {"typeDefinitionsOffset",             0xA0},
             {"typeDefinitionsSize",               0xA4},
+            // V29: no rgctx (29 > 24.1), no metadataUsage (29 > 24.5)
             {"imagesOffset",                      0xA8},
             {"imagesSize",                        0xAC},
             {"assembliesOffset",                  0xB0},
@@ -69,18 +70,23 @@ public:
             {"fieldRefsSize",                     0xBC},
             {"referencedAssembliesOffset",        0xC0},
             {"referencedAssembliesSize",          0xC4},
+            // V29+: NEW attribute data fields (Min=29, replaces attributesInfo)
             {"attributeDataOffset",               0xC8},
             {"attributeDataSize",                 0xCC},
             {"attributeDataRangeOffset",          0xD0},
             {"attributeDataRangeSize",            0xD4},
+            // V22+: unresolved virtual calls
             {"unresolvedVirtualCallParameterTypesOffset",   0xD8},
             {"unresolvedVirtualCallParameterTypesSize",     0xDC},
             {"unresolvedVirtualCallParameterRangesOffset",  0xE0},
             {"unresolvedVirtualCallParameterRangesSize",    0xE4},
+            // V23+: Windows Runtime
             {"windowsRuntimeTypeNamesOffset",     0xE8},
             {"windowsRuntimeTypeNamesSize",       0xEC},
+            // V27+: Windows Runtime strings
             {"windowsRuntimeStringsOffset",       0xF0},
             {"windowsRuntimeStringsSize",         0xF4},
+            // V24+: exported types
             {"exportedTypeDefinitionsOffset",     0xF8},
             {"exportedTypeDefinitionsSize",       0xFC},
         };
@@ -89,19 +95,20 @@ public:
     }
 
     size_t structSize(const std::string& key) const override {
-        // V31 structs: Il2CppMethodDefinition now has returnParameterToken (Min=31)
+        // V29 structs: same as V27 for most types
+        // Il2CppCustomAttributeDataRange: NEW struct (replaces Il2CppCustomAttributeTypeRange)
         // Source: il2cpp-dumper-rs metadata.rs + Il2CppDumper MetadataClass.cs
         static const std::unordered_map<std::string, size_t> kSizes = {
-            {"Il2CppTypeDefinition",     0x58}, // same as v27/v29
-            {"Il2CppMethodDefinition",    0x20}, // CHANGED: adds returnParameterToken (Min=31) → +4 bytes
-            {"Il2CppFieldDefinition",    0x0C}, // same as v27/v29
-            {"Il2CppParameterDefinition", 0x0C}, // same as v27/v29
-            {"Il2CppPropertyDefinition", 0x14}, // same as v27/v29
-            {"Il2CppEventDefinition",    0x18}, // same as v27/v29
-            {"Il2CppImageDefinition",    0x28}, // same as v27/v29
-            {"Il2CppAssemblyDefinition", 0x44}, // same as v27/v29
-            {"Il2CppAssemblyNameDefinition", 0x30}, // same as v27/v29
-            {"Il2CppCustomAttributeDataRange", 0x08}, // same as v29
+            {"Il2CppTypeDefinition",     0x58}, // same as v27
+            {"Il2CppMethodDefinition",    0x1C}, // same as v27
+            {"Il2CppFieldDefinition",    0x0C}, // same as v27
+            {"Il2CppParameterDefinition", 0x0C}, // same as v27
+            {"Il2CppPropertyDefinition", 0x14}, // same as v27
+            {"Il2CppEventDefinition",    0x18}, // same as v27
+            {"Il2CppImageDefinition",    0x28}, // same as v27
+            {"Il2CppAssemblyDefinition", 0x44}, // same as v27
+            {"Il2CppAssemblyNameDefinition", 0x30}, // same as v27 (no hashValueIndex)
+            {"Il2CppCustomAttributeDataRange", 0x08}, // NEW: token + startOffset
             {"Il2CppStringLiteral",      0x10}, // token + dataIndex
         };
         auto it = kSizes.find(key);
@@ -114,7 +121,7 @@ public:
         std::memcpy(&magic, headerBytes, 4);
         uint32_t ver;
         std::memcpy(&ver, headerBytes + 4, 4);
-        return magic == 0xFAB11BAF && ver == 31;
+        return magic == 0xFAB11BAF && ver == 29;
     }
 };
 

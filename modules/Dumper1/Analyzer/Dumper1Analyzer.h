@@ -2,9 +2,9 @@
 // Dumper1 — IL2CPP metadata parser (adapted from il2cpp-dumper-rs).
 // Parses global-metadata.dat with XOR decryption, extracts TypeDefs, MethodDefs,
 // FieldDefs, and string literals. Resolves names via string data blob lookup.
-#include "../../../DumperCore/IDumperEngine.h"
-#include "../../../DumperCore/IEngineProfile.h"
-#include "../../../DumperCore/SharedUtils/SharedUtils.h"
+#include "../../Dumper/DumperCore/IDumperEngine.h"
+#include "../../Dumper/DumperCore/IEngineProfile.h"
+#include "../../Dumper/DumperCore/SharedUtils/SharedUtils.h"
 #include <cstdint>
 #include <cstring>
 #include <memory>

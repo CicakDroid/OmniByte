@@ -1,7 +1,7 @@
 #pragma once
 // Dumper1 StructGenerator — generates struct layout definitions from DumpData.
 // Produces C-style struct declarations with field offsets for reverse engineering.
-#include "../../../DumperCore/DumpResult.h"
+#include "../../Dumper/DumperCore/DumpResult.h"
 #include <fstream>
 #include <sstream>
 #include <iomanip>

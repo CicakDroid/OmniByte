@@ -2,7 +2,7 @@
 // Dumper1 — IL2CPP v24 profile (Unity 2017.1 – 2018.3).
 // Source: il2cpp-dumper-rs metadata.rs + Perfare/Il2CppDumper MetadataClass.cs
 // Header: Il2CppGlobalMetadataHeader with rgctx fields present (version <= 24.1)
-#include "../../../DumperCore/IEngineProfile.h"
+#include "../../Dumper/DumperCore/IEngineProfile.h"
 #include <string>
 #include <cstdint>
 #include <cstring>

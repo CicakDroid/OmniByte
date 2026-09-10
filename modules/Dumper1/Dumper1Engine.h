@@ -3,8 +3,8 @@
 // Implements IDumperEngine. Orchestrates Analyzer + Resolver + Profiles.
 // Detects binary format (ELF/PE/Mach-O/NSO/WASM), parses metadata with XOR
 // decryption, finds CodeRegistration/MetadataRegistration, generates dump output.
-#include "../../DumperCore/IDumperEngine.h"
-#include "../../DumperCore/IEngineProfile.h"
+#include "../Dumper/DumperCore/IDumperEngine.h"
+#include "../Dumper/DumperCore/IEngineProfile.h"
 #include "Analyzer/Dumper1Analyzer.h"
 #include "Resolver/Dumper1Resolver.h"
 #include "Output/DumpCsWriter.h"

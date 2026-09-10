@@ -2,7 +2,7 @@
 // Dumper1 — IL2CPP v27 profile (Unity 2018.3 – 2021.2).
 // Source: il2cpp-dumper-rs metadata.rs + Perfare/Il2CppDumper MetadataClass.cs
 // Header: DIFFERENT from V24 — rgctx removed, metadataUsage removed, windowsRuntimeStrings added
-#include "../../../DumperCore/IEngineProfile.h"
+#include "../../Dumper/DumperCore/IEngineProfile.h"
 #include <string>
 #include <cstdint>
 #include <cstring>

@@ -1,7 +1,7 @@
 #pragma once
 // Dumper1 StaticFieldExporter — exports static field address/offset information.
 // Produces a text report of all fields with their offsets, useful for runtime patching.
-#include "../../../DumperCore/DumpResult.h"
+#include "../../Dumper/DumperCore/DumpResult.h"
 #include <fstream>
 #include <sstream>
 #include <iomanip>

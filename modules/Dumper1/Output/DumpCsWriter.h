@@ -2,7 +2,7 @@
 // Dumper1 DumpCsWriter — generates dump.cs (C# class stubs).
 // Matches il2cpp-dumper output format: namespace/type hierarchy, fields with
 // offset comments, methods with RVA placeholders.
-#include "../../../DumperCore/DumpResult.h"
+#include "../../Dumper/DumperCore/DumpResult.h"
 #include <fstream>
 #include <sstream>
 #include <iomanip>

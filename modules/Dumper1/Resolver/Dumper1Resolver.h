@@ -4,9 +4,9 @@
 // ELF: parses section headers (SHT_SYMTAB/SHT_DYNSYM) + string table.
 // PE: walks export directory + section table.
 // Mach-O: walks nlist symbol table + string table.
-#include "../../../DumperCore/IDumperEngine.h"
-#include "../../../DumperCore/IEngineProfile.h"
-#include "../../../DumperCore/SharedUtils/SharedUtils.h"
+#include "../../Dumper/DumperCore/IDumperEngine.h"
+#include "../../Dumper/DumperCore/IEngineProfile.h"
+#include "../../Dumper/DumperCore/SharedUtils/SharedUtils.h"
 #include <cstdint>
 #include <cstring>
 #include <memory>
