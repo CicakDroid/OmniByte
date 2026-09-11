@@ -3,7 +3,7 @@
 **Nama Proyek:** Pengembangan OmniByte
 **Tanggal:** 2026-09-05
 **Status:** Final
-**Revisi:** 4.3 — Penambahan Taskflow ke Perbandingan Thread Pool (oneTBB vs BS::thread_pool vs Taskflow)
+**Revisi:** 4.4 — Penambahan MBA, BMH, Algoritma, Aritmatika, dan Struktur Data untuk Reverse Engineering
 
 ---
 
@@ -80,9 +80,14 @@
 49. [Target Fungsi dalam Game](#49-target-fungsi-dalam-game)
 50. [Mod Menu Implementation Flow](#50-mod-menu-implementation-flow)
 51. [Thread Pool untuk Pemrosesan Paralel](#51-thread-pool-untuk-pemrosesan-paralel)
-52. [Kesimpulan & Relevansi untuk OmniByte](#52-kesimpulan--relevansi-untuk-omnibyte)
-53. [Native Binary & Metadata File Types (Dumper/Engines/Profiles)](#53-native-binary--metadata-file-types-dumperenginesprofiles)
-54. [Daftar Pustaka & Sitasi](#54-daftar-pustaka--situsi)
+52. [Mixed Boolean-Arithmetic (MBA)](#52-mixed-boolean-arithmetic-mba)
+53. [Boyer-Moore-Horspool (BMH)](#53-boyer-moore-horspool-bmh)
+54. [Algoritma untuk Reverse Engineering](#54-algoritma-untuk-reverse-engineering)
+55. [Aritmatika untuk Reverse Engineering](#55-aritmatika-untuk-reverse-engineering)
+56. [Struktur Data untuk Reverse Engineering](#56-struktur-data-untuk-reverse-engineering)
+57. [Kesimpulan & Relevansi untuk OmniByte](#57-kesimpulan--relevansi-untuk-omnibyte)
+58. [Native Binary & Metadata File Types (Dumper/Engines/Profiles)](#58-native-binary--metadata-file-types-dumperenginesprofiles)
+59. [Daftar Pustaka & Sitasi](#59-daftar-pustaka--situsi)
 
 ---
 
@@ -2319,7 +2324,651 @@ executor.run(taskflow).get();  // Wait for completion
 
 ---
 
-## 52. Kesimpulan & Relevansi untuk OmniByte
+## 52. Mixed Boolean-Arithmetic (MBA)
+
+### Apa itu MBA?
+
+Mixed Boolean-Arithmetic (MBA) adalah teknik obfuscation yang menggabungkan operasi boolean (AND, OR, XOR) dengan operasi aritmatika (ADD, SUB, MUL) untuk menyembunyikan logika asli kode. Teknik ini sangat efektif karena membuat kode sulit dipahami oleh reverse engineer, tetapi tetap menghasilkan output yang sama dengan kode asli.
+
+### Identitas MBA Dasar
+
+Berikut adalah identitas MBA yang paling sering digunakan:
+
+#### 1. Identity 1 (XOR + AND)
+```
+x ⊕ y = (x | y) - (x & y)
+```
+**Penjelasan**: XOR bisa direpresentasikan sebagai UNION dikurangi INTERSEksi.
+
+#### 2. Identity 2 (OR + AND)
+```
+x | y = (x ⊕ y) + (x & y)
+```
+**Penjelasan**: OR adalah XOR ditambah AND.
+
+#### 3. Identity 3 (NOT dengan XOR)
+```
+¬x = x ⊕ 1
+```
+**Penjelasan**: NOT bit adalah XOR dengan 1.
+
+#### 4. Identity 4 (De Morgan dengan MBA)
+```
+¬(x & y) = (x ⊕ 1) | (y ⊕ 1)
+```
+
+#### 5. Identity 5 (Distributif campuran)
+```
+x & (y ⊕ z) = (x & y) ⊕ (x & z)
+```
+
+### Contoh MBA dalam Assembly
+
+#### Sebelum Obfuscation (kode asli):
+```c
+// Fungsi sederhana: return x + y
+int add(int x, int y) {
+    return x + y;
+}
+```
+
+#### Sesudah Obfuscation (dengan MBA):
+```c
+// Fungsi yang sama dengan MBA obfuscation
+int add_obfuscated(int x, int y) {
+    // Layer 1: Identity yang diketahui
+    int a = x ^ y;           // XOR
+    int b = x & y;           // AND
+    int c = a + (b << 1);    // Full adder logic
+    
+    // Layer 2: Tambahan noise dengan identity lain
+    int d = (x | y) - (x & y);  // = x ^ y (redundant)
+    int e = c ^ d;               // XOR dengan redundant
+    
+    // Layer 3: Lebih banyak noise
+    int f = e + 0;               // Add zero (no-op)
+    int g = f ^ (x & ~x);       // XOR dengan 0 (no-op)
+    
+    return g;
+}
+```
+
+### Kenapa MBA Sulit Direverse?
+
+1. **Banyak Representasi Sama**: Ada ratusan cara menulis `x + y` menggunakan operasi boolean dan aritmatika
+2. **Identitas Bisa Dikombinasikan**: Setiap identitas bisa ditumpuk dengan identitas lain
+3. **Noise Operations**: Operasi tambahan yang tidak mengubah hasil (seperti `x ^ 0 = x`)
+4. **Distributif & Komutatif**: Sifat aljabar memungkinkan banyak transformasi
+
+### Tools untuk MBA Deobfuscation
+
+| Tool | Bahasa | Fungsi |
+|------|--------|--------|
+| **SiMBA** | Python | Simplifikasi MBA expressions menggunakan SMT solver |
+| **MBA-Blast** | Python | Deteksi dan blast MBA patterns |
+| **msynth** | Python | Learning-based MBA simplification |
+| **SSPAM** | Python | Pattern matching untuk MBA |
+| **Syntia** | Python | Synthesis-based deobfuscation |
+| **Arybo** | Python | Manipulasi ekspresi boolean/aritmatika |
+| **ProMBA** | Python | MBA simplification dengan proof |
+
+### Relevansi untuk OmniByte
+
+MBA detection dan simplification penting untuk:
+- **HydraDis**: Analisis kode yang di-obfuscate
+- **Expression Synthesis**: Menyederhanakan ekspresi kompleks
+- **MetadataSearchPipeline**: Pattern matching untuk MBA patterns
+
+### Contoh Implementasi di OmniByte
+
+```cpp
+// PatternScanner bisa ditambahkan MBA pattern detection
+class MBADetector {
+public:
+    // Deteksi pattern MBA umum
+    bool detectMBAPattern(const std::vector<uint8_t>& code);
+    
+    // Simplifikasi menggunakan aljabar Boolean
+    Expression simplifyMBA(const Expression& expr);
+    
+    // Gunakan SMT solver untuk verifikasi
+    bool verifyEquivalence(const Expression& original, 
+                          const Expression& simplified);
+};
+```
+
+### Referensi
+
+- Bilim, F. et al., "Obfuscation with Mixed Boolean-Arithmetic Expressions," 2013
+- Yadav, A. et al., "A Learning-based Approach for MBA Expression Simplification"
+- Zeroscience, "SiMBA: MBA Simplification," https://github.com/zyqstack/zyqstack
+
+---
+
+## 53. Boyer-Moore-Horspool (BMH)
+
+### Apa itu BMH?
+
+Boyer-Moore-Horspool (BMH) adalah algoritma pencarian string yang merupakan penyederhanaan dari algoritma Boyer-Moore. BMH menggunakan satu tabel shift saja (shift table), bukan dua seperti Boyer-Moore asli.
+
+### Cara Kerja BMH
+
+1. **Shift Table**: Membuat tabel berdasarkan karakter terakhir dari pattern
+2. **Pencarian**: Membandingkan dari kanan ke kiri (dari karakter terakhir pattern)
+3. **Shift**: Jika tidak cocok, shift berdasarkan karakter di posisi yang tidak cocok
+
+### Shift Table
+
+Untuk pattern `P` dengan panjang `m`:
+```
+Shift[c] = m - 1 - position_of_last_occurrence(c in P[0..m-2])
+```
+
+Jika karakter `c` tidak ada di pattern, shift = `m - 1`.
+
+### Contoh
+
+Pattern: `ABCD`
+Text: `AABABCD`
+
+```
+Step 1: AABABCD
+        ABCD
+        ^
+        Mismatch di C (text) vs B (pattern)
+        Shift['C'] = 3 (tidak ada di pattern sebelum m-1)
+
+Step 2: AABABCD
+          ABCD
+          ^
+          Mismatch di B vs B → cocok!
+          Lanjut ke kanan...
+          
+Step 3: AABABCD
+            ABCD
+            ^
+            Match! Pattern ditemukan di posisi 3
+```
+
+### Perbandingan dengan Algoritma Lain
+
+| Algoritma | Preprocessing | Worst Case | Best Case | Space |
+|-----------|---------------|------------|-----------|-------|
+| Brute Force | O(1) | O(n×m) | O(m) | O(1) |
+| KMP | O(m) | O(n) | O(n/m) | O(m) |
+| Boyer-Moore | O(m+σ) | O(n×m) | O(n/m) | O(m+σ) |
+| **BMH** | O(m+σ) | O(n×m) | O(n/m) | O(σ) |
+
+σ = ukuran alfabet (256 untuk byte)
+
+### BMH untuk Pattern Matching di Binary
+
+Dalam konteks reverse engineering, BMH berguna untuk:
+- **Signature scanning**: Mencari pattern byte dalam binary
+- **String detection**: Mencari string di dalam executable
+- **Opcode matching**: Mencari sequence instruction tertentu
+
+### Relevansi untuk OmniByte
+
+Saat ini OmniByte menggunakan brute-force pattern scanning:
+
+```cpp
+// PatternScanner.cpp - Brute force O(n*m)
+bool PatternScanner::scan() {
+    for (size_t i = 0; i <= data_size - pattern_size; i++) {
+        bool match = true;
+        for (size_t j = 0; j < pattern_size; j++) {
+            if (data[i + j] != pattern[j]) {
+                match = false;
+                break;
+            }
+        }
+        if (match) return true;
+    }
+    return false;
+}
+```
+
+Dengan BMH, performa bisa ditingkatkan signifikan:
+
+```cpp
+// BMH PatternScanner
+class BMHPatternScanner {
+    std::array<size_t, 256> shift_table;
+    
+    void buildShiftTable(const std::vector<uint8_t>& pattern) {
+        size_t m = pattern.size();
+        std::fill(shift_table.begin(), shift_table.end(), m);
+        for (size_t i = 0; i < m - 1; i++) {
+            shift_table[pattern[i]] = m - 1 - i;
+        }
+    }
+    
+    size_t search(const uint8_t* data, size_t data_size,
+                  const std::vector<uint8_t>& pattern) {
+        size_t m = pattern.size();
+        if (m > data_size) return std::string::npos;
+        
+        size_t i = 0;
+        while (i <= data_size - m) {
+            size_t j = m - 1;
+            while (j < m && data[i + j] == pattern[j]) {
+                j--;
+            }
+            if (j == SIZE_MAX) return i; // Found
+            i += shift_table[data[i + m - 1]];
+        }
+        return std::string::npos; // Not found
+    }
+};
+```
+
+### Performance Improvement
+
+Untuk binary besar (10MB+), BMH bisa memberikan speedup 3-5x dibanding brute-force, terutama untuk pattern yang lebih panjang.
+
+### Referensi
+
+- Horspool, R.N., "Practical Fast Searching in Strings," 1980
+- Boyer, R.S. & Moore, J.S., "A Fast String Searching Algorithm," 1977
+- Boost.Algorithm: https://www.boost.org/doc/libs/latest/libs/algorithm/
+
+---
+
+## 54. Algoritma untuk Reverse Engineering
+
+### 1. String Matching Algorithms
+
+#### Boyer-Moore-Horspool (BMH)
+- **Fungsi**: Pencarian pattern byte efisien
+- **Kelebihan**: Simple, cache-friendly, performa bagus untuk pattern panjang
+- **Kasus**: Signature scanning, pattern matching
+
+#### Aho-Corasick
+- **Fungsi**: Multi-pattern matching secara simultan
+- **Kelebihan**: O(n + m + z) untuk semua pattern, z = jumlah match
+- **Kasus**: Mencari banyak string sekaligus
+
+#### Knuth-Morris-Pratt (KMP)
+- **Fungsi**: Pattern matching dengan preprocessing
+- **Kelebihan**: Worst case O(n), cocok untuk pattern repetitif
+- **Kasus**: String searching dengan pattern yang sering berulang
+
+### 2. Graph Algorithms
+
+#### Dominator Tree
+- **Fungsi**: Menentukan blok yang harus dieksekusi
+- **Algoritma**: Cooper-Harvey-Kennedy iterative
+- **Kasus**: Control flow analysis, optimasi kode
+
+#### Strongly Connected Components (SCC)
+- **Fungsi**: Deteksi siklus dalam CFG
+- **Algoritma**: Tarjan's algorithm
+- **Kasus**: Loop detection, reducibility testing
+
+#### DFS/BFS Traversal
+- **Fungsi**: Traversal CFG
+- **Kasus**: Reachability analysis, dead code detection
+
+### 3. Expression Simplification
+
+#### Constant Folding
+- **Fungsi**: Evaluasi konstanta saat compile time
+- **Contoh**: `3 + 4` → `7`
+
+#### Common Subexpression Elimination
+- **Fungsi**: Hapus ekspresi yang sama
+- **Contoh**: `a*b + a*b` → `temp = a*b; temp + temp`
+
+#### Algebraic Simplification
+- **Fungsi**: Simplifikasi ekspresi aljabar
+- **Contoh**: `x * 0` → `0`, `x + 0` → `x`
+
+### 4. Value Numbering
+
+#### Local Value Numbering
+- **Fungsi**: Assign nomor unik untuk setiap nilai
+- **Kasus**: Identifikasi nilai yang sama
+
+#### Global Value Numbering
+- **Fungsi**: Value numbering lintas blok
+- **Kasus**: Optimasi silang blok
+
+### 5. Alias Analysis
+
+#### Steensgaard's Algorithm
+- **Fungsi**: Flow-insensitive alias analysis
+- **Kasus**: Menentukan pointer yang bisa menunjuk ke alamat sama
+
+#### Andersen's Algorithm
+- **Fungsi**: Flow-insensitive, inclusion-based
+- **Kasus**: Analisis dependensi pointer
+
+### 6. Data Flow Analysis
+
+#### Reaching Definitions
+- **Fungsi**: Definisi yang bisa mencapai titik tertentu
+- **Kasus**: Taint analysis, def-use chain
+
+#### Liveness Analysis
+- **Fungsi**: Variabel yang masih digunakan
+- **Kasus**: Register allocation, dead code elimination
+
+### 7. Interval Analysis
+- **Fungsi**: Analisis rentang nilai
+- **Kasus**: Bounds checking, array index validation
+
+### 8. Pattern Detection
+- **Fungsi**: Deteksi struktur dalam CFG
+- **Pola**: Diamond, triangle, hammock, critical edge
+- **Kasus**: Code structure recovery
+
+---
+
+## 55. Aritmatika untuk Reverse Engineering
+
+### 1. Big Integer / Arbitrary Precision Arithmetic
+
+#### Apa itu?
+Library untuk operasi bilangan dengan presisi tak terbatas (batas oleh memory).
+
+#### Library Penting
+
+| Library | Bahasa | Fitur |
+|---------|--------|-------|
+| **GMP** | C | GNU Multiple Precision, sangat cepat |
+| **cpp_int (Boost)** | C++ | Bagian dari Boost.Multiprecision |
+| **ctbignum** | C++ | Compile-time big integer |
+| **BigInteger (Java)** | Java | Built-in Java |
+| **System.Numerics** | C# | .NET big integer |
+
+#### Kasus di RE
+- **RSA analysis**: Analisis kunci RSA yang sangat besar
+- **Cryptographic hash**: Analisis hash function
+- **Address calculation**: Perhitungan alamat memori 64-bit
+- **Virtual address space**: Manipulasi virtual address
+
+### 2. Modular Arithmetic
+
+#### Apa itu?
+Aritmatika di atas ring (modulo n).
+
+#### Konsep Penting
+
+```
+a ≡ b (mod n) berarti a dan b memiliki sisa yang sama saat dibagi n
+```
+
+#### Sifat-sifat
+```
+(a + b) mod n = ((a mod n) + (b mod n)) mod n
+(a × b) mod n = ((a mod n) × (b mod n)) mod n
+```
+
+#### Modular Inverse
+```
+a × a^(-1) ≡ 1 (mod n)
+```
+
+#### Extended Euclidean Algorithm
+Mencari `x` dan `y` sehingga:
+```
+ax + by = gcd(a, b)
+```
+
+### 3. Barrett Reduction
+
+#### Apa itu?
+Teknik untuk mempercepat modular reduction dengan mengganti operasi divisi dengan perkalian.
+
+#### Algoritma
+```
+Precompute:
+  μ = ⌊2^(2k) / n⌋   (k = bit length of n)
+
+Operation:
+  q = ⌊(a × μ) / 2^(2k)⌋
+  r = a - q × n
+  if r >= n: r = r - n
+```
+
+#### Kelebihan
+- Menghindari operasi divisi yang mahal
+- Menggunakan perkalian dan shift saja
+- Sangat efisien untuk modulus tetap
+
+### 4. Montgomery Multiplication
+
+#### Apa itu?
+Teknik untuk mempercepat modular exponentiation.
+
+#### Algoritma
+```
+Precompute:
+  R = 2^k (k > bit length n)
+  R^(-1) mod n
+  N' = -n^(-1) mod R
+
+Operation:
+  T = a × b
+  m = (T × N') mod R
+  t = (T + m × n) / R
+  if t >= n: t = t - n
+```
+
+#### Kelebihan
+- Mengubah modular reduction menjadi shift
+- Sangat efisien untuk RSA, ECC, dan kripto lainnya
+
+### 5. Polynomial Arithmetic
+
+#### Apa itu?
+Operasi pada polinom di atas field (GF(2^n)).
+
+#### Kasus di RE
+- **CRC calculation**: Cyclic Redundancy Check
+- **Polynomial hashing**: Hash function berbasis polinom
+- **AES S-box**: Berdasarkan inverse di GF(2^8)
+- **Error correction codes**: Reed-Solomon, BCH
+
+### 6. Bit Manipulation Techniques
+
+#### Popcount (Hamming Weight)
+```
+Menghitung jumlah bit 1 dalam bilangan
+```
+
+#### Leading/Trailing Zeros
+```
+Menghitung bit 0 di awal/akhir
+```
+
+#### Bitfield Extraction
+```
+Mengambil bit pada posisi tertentu
+```
+
+### 7. Fixed-Point Arithmetic
+
+#### Apa itu?
+Representasi bilangan pecahan tanpa titik desimal.
+
+#### Format
+```
+Q格式: Qn.m
+n = jumlah bit integer
+m = jumlah bit fractional
+Contoh: Q8.8 = 16-bit, 8 bit integer + 8 bit fractional
+```
+
+#### Kelebihan untuk RE
+- Floating-point analysis lebih mudah
+- Presisi terkontrol
+- Performa lebih cepat dari floating-point
+
+---
+
+## 56. Struktur Data untuk Reverse Engineering
+
+### 1. Trie (Prefix Tree)
+
+#### Apa itu?
+Struktur data pohon untuk menyimpan string dengan shared prefix.
+
+#### Implementasi
+
+```cpp
+struct TrieNode {
+    std::unordered_map<char, std::unique_ptr<TrieNode>> children;
+    bool is_end = false;
+    uint64_t value;  // Metadata
+};
+
+class Trie {
+    std::unique_ptr<TrieNode> root;
+    
+public:
+    void insert(const std::string& key, uint64_t val);
+    uint64_t search(const std::string& key);
+    std::vector<std::string> prefixSearch(const std::string& prefix);
+};
+```
+
+#### Kasus di RE
+- **Symbol lookup**: Cepat mencari fungsi/variabel
+- **String interning**: Menyimpan string unik
+- **Autocomplete**: Suggestion untuk nama fungsi
+- **Opcode classification**: Mengklasifikasikan instruction
+
+### 2. Suffix Array
+
+#### Apa itu?
+Array berisi semua suffix dari string, diurutkan.
+
+#### Contoh
+```
+String: "banana"
+Suffix Array: [5, 3, 1, 0, 4, 2]
+Suffix: ["a", "ana", "anana", "banana", "na", "nana"]
+```
+
+#### Implementasi Efficient
+
+```cpp
+class SuffixArray {
+    std::vector<int> sa;  // Suffix array
+    std::vector<int> lcp; // Longest common prefix
+    
+public:
+    SuffixArray(const std::string& s); // O(n log n)
+    
+    // Pencarian substring O(m log n)
+    size_t search(const std::string& pattern) const;
+    
+    // Pencarian semua occurences
+    std::vector<size_t> findAll(const std::string& pattern) const;
+};
+```
+
+#### Kasus di RE
+- **String search**: Pencarian substring sangat cepat
+- **Pattern matching**: Mencari pattern dalam binary
+- **Data extraction**: Mencari string di dalam binary besar
+- **Compression**: LZ77, LZ78, LZW
+
+### 3. Bloom Filter
+
+#### Apa itu?
+Struktur data probabilistik untuk cek keberadaan elemen.
+
+#### Sifat
+- **False Positive**: Bisa bilang "ada" padahal tidak ada
+- **False Negative**: Tidak pernah terjadi
+- **Space efficient**: Jauh lebih hemat dari hash table
+
+#### Implementasi
+
+```cpp
+class BloomFilter {
+    std::vector<bool> bits;
+    size_t num_hashes;
+    
+public:
+    BloomFilter(size_t expected_elements, double fp_rate);
+    
+    void add(const std::string& item);
+    bool mightContain(const std::string& item) const;
+    
+    // Operasi set
+    BloomFilter operator|(const BloomFilter& other);  // Union
+    BloomFilter operator&(const BloomFilter& other);  // Intersection
+};
+```
+
+#### Kasus di RE
+- **Quick filtering**: Cek apakah signature mungkin ada
+- **Deduplication**: Cek duplikat tanpa store semua data
+- **Cache**: Cek apakah alamat sudah di-cache
+- **Malware detection**: Quick check untuk signature
+
+### 4. Cuckoo Hashing
+
+#### Apa itu?
+Hash table dengan worst-case O(1) lookup.
+
+#### Sifat
+- Menggunakan 2-3 hash functions
+- Jika tab满了, "kick out" elemen yang sudah ada
+- Worst-case O(1) lookup, insert, delete
+
+#### Kasus di RE
+- **Fast lookup**: Cari symbol/alamat sangat cepat
+- **Pattern cache**: Cache pattern yang sudah di-scan
+- **Address translation**: Map virtual ke physical address
+
+### 5. Skip List
+
+#### Apa itu?
+Linked list dengan layer tambahan untuk jump.
+
+#### Kasus di RE
+- **Ordered data**: Menyimpan data yang perlu diurutkan
+- **Range query**: Query rentang alamat
+- **Symbol table**: Tabel simbol yang terurut
+
+### 6. Interval Tree
+
+#### Apa itu?
+Struktur data untuk query interval overlap.
+
+#### Kasus di RE
+- **Memory mapping**: Cek overlap alamat memori
+- **Section detection**: Deteksi section yang overlap
+- **Protection analysis**: Analisis proteksi memori
+
+### 7. Union-Find (Disjoint Set)
+
+#### Apa itu?
+Struktur data untuk query dan union pada set disjoint.
+
+#### Kasus di RE
+- **Alias analysis**: Menentukan pointer yang bisa menunjuk ke tempat sama
+- **Equivalence classes**: Mengelompokkan variabel yang setara
+- **Data flow**: Mengelompokkan definisi yang sama
+
+### 8. Aho-Corasick Automaton
+
+#### Apa itu?
+Finite state machine untuk multi-pattern matching.
+
+#### Kasus di RE
+- **Multi-pattern search**: Mencari banyak pattern sekaligus
+- **Signature detection**: Deteksi banyak signature
+- **Malware scanning**: Scan untuk banyak malware signature
+
+---
+
+## 57. Kesimpulan & Relevansi untuk OmniByte
 
 ### Workflow RE Lengkap (Updated)
 
@@ -2417,7 +3066,7 @@ Pemahaman terhadap workflow ini penting untuk pengembangan OmniByte:
 
 ---
 
-## 53. Native Binary & Metadata File Types (Dumper/Engines/Profiles)
+## 58. Native Binary & Metadata File Types (Dumper/Engines/Profiles)
 
 ### Daftar File Type Berdasarkan Engine
 
@@ -2564,7 +3213,7 @@ auto bestMatch = registry.detectBestMatch(target);
 
 ---
 
-## 54. Daftar Pustaka & Sitasi
+## 59. Daftar Pustaka & Sitasi
 
 ### Root Access & Kernel Patching
 1. ShirkNeko, "SukiSU-Ultra: Kernel-based Android Root Solution & KPM," GitHub, https://github.com/ShirkNeko/SukiSU-Ultra
@@ -2638,9 +3287,42 @@ auto bestMatch = registry.detectBestMatch(target);
 45. Android Open Source Project, "Signing Your App," https://developer.android.com/studio/publish/app-signing
 46. patrickfav, "uber-apk-signer: A tool to zipalign, sign and verify Android APKs," GitHub, https://github.com/patrickfav/uber-apk-signer
 
+### Mixed Boolean-Arithmetic (MBA)
+47. Bilim, F. et al., "Obfuscation with Mixed Boolean-Arithmetic Expressions: Analysis and Deobfuscation," 2013
+48. Yadav, A. et al., "A Learning-based Approach for MBA Expression Simplification," 2020
+49. Zeroscience, "SiMBA: MBA Simplification Tool," GitHub, https://github.com/zyqstack/zyqstack
+50. mrphrazer, "msynth: Learning-based MBA Simplification," GitHub, https://github.com/mrphrazer/msynth
+
+### String Matching Algorithms
+51. Horspool, R.N., "Practical Fast Searching in Strings," Software: Practice and Experience, 1980
+52. Boyer, R.S. & Moore, J.S., "A Fast String Searching Algorithm," Communications of the ACM, 1977
+53. Aho, A.V. & Corasick, M.J., "Efficient String Matching: An Aid to Bibliographic Search," Communications of the ACM, 1975
+54. Knuth, D.E., Morris, J.H. & Pratt, V., "Fast Pattern Matching in Strings," SIAM Journal on Computing, 1977
+55. Boost.Algorithm, "String Search Algorithms," https://www.boost.org/doc/libs/latest/libs/algorithm/
+
+### Graph & Control Flow Analysis
+56. Cooper, K.D., Harvey, T.J. & Kennedy, K., "A Simple, Fast Dominance Algorithm," 2001
+57. Tarjan, R.E., "Depth-First Search and Linear Graph Algorithms," SIAM Journal on Computing, 1972
+58. coconutbird, "cfglib: Generic CFG library for binary analysis," GitHub, https://github.com/coconutbird/cfglib
+
+### Big Integer & Modular Arithmetic
+59. Granlund, T., "GNU MP: The GNU Multiple Precision Arithmetic Library," https://gmplib.org/
+60. Boost.Multiprecision, "cpp_int: Arbitrary Precision Integer," https://www.boost.org/doc/libs/latest/libs/multiprecision/
+61. ctbignum, "Compile-time Big Integer Library," GitHub, https://github.com/colinrford/ctbignum
+
+### Data Structures
+62. Manber, U. & Myers, G., "Suffix Arrays: A New Method for On-Line String Searches," SIAM Journal on Computing, 1993
+63. Bloom, B.H., "Space/Time Trade-offs in Hash Coding with Allowable Errors," Communications of the ACM, 1970
+64. Boost.Bloom, "Bloom Filter Implementation," https://www.boost.org/doc/libs/develop/libs/bloom/
+
+### Binary Analysis Tools
+65. cursey, "kananlib: Binary analysis library," GitHub, https://github.com/cursey/kananlib
+66. danielplohmann, "smda: Recursive disassembler for CFG recovery," GitHub, https://github.com/danielplohmann/smda
+67. TheAlgorithms, "C-Plus-Plus: Educational C++ algorithms," GitHub, https://github.com/TheAlgorithms/C-Plus-Plus
+
 ---
 
 **Dokumen ini merupakan bagian dari proyek Pengembangan OmniByte dan disusun sebagai referensi teknis untuk tim pengembang.**
 
-**Terakhir diperbarui:** 2026-09-05
-**Revisi:** 4.0
+**Terakhir diperbarui:** 2026-09-11
+**Revisi:** 4.4
