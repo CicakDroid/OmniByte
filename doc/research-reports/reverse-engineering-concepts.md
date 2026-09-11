@@ -3320,9 +3320,428 @@ auto bestMatch = registry.detectBestMatch(target);
 66. danielplohmann, "smda: Recursive disassembler for CFG recovery," GitHub, https://github.com/danielplohmann/smda
 67. TheAlgorithms, "C-Plus-Plus: Educational C++ algorithms," GitHub, https://github.com/TheAlgorithms/C-Plus-Plus
 
+### Model Context Protocol (MCP)
+68. Anthropic, "Model Context Protocol Specification," https://modelcontextprotocol.io/specification/2025-11-25
+69. Anthropic, "MCP Architecture Documentation," https://modelcontextprotocol.io/docs/2025-11-25/learn/architecture
+70. Microsoft, "MCP for Beginners," GitHub, https://github.com/microsoft/mcp-for-beginners
+71. hkr04, "cpp-mcp: C++ MCP SDK," GitHub, https://github.com/hkr04/cpp-mcp
+72. CHZarles, "cpp-mcp: Lightweight C++ MCP," GitHub, https://github.com/CHZarles/cpp-mcp
+73. LostSyscall, "cppmcp: C++ MCP server library," GitHub, https://github.com/LostSyscall/cppmcp
+74. itcv-GmbH, "cpp-mcp-sdk: MCP 2025-11-25 compliant C++ SDK," GitHub, https://github.com/itcv-GmbH/cpp-mcp-sdk
+75. Artem535, "PhoenixMCP: C++20 MCP server," GitHub, https://github.com/Artem535/PhoenixMcp
+
+### MCP untuk Reverse Engineering
+76. sjkim1127, "Reversecore MCP: 120 RE tools via MCP," GitHub, https://github.com/sjkim1127/Reversecore_MCP
+77. afiffebri, "Revula: Production-grade RE MCP server," GitHub, https://github.com/afiffebri/revula
+78. unrealsoftwaredev, "ida-mcp: IDA Pro MCP server via idalib," GitHub, https://github.com/unrealsoftwaredev/ida-mcp
+79. LaurieWired, "GhidraMCP: MCP server for Ghidra," GitHub, https://github.com/LaurieWired/GhidraMCP
+80. 0xshlomil, "ida-free-mcp: Native C++ IDA MCP plugin," GitHub, https://github.com/0xshlomil/ida-free-mcp
+
+---
+
+## 60. Model Context Protocol (MCP)
+
+### 60.1 Apa itu MCP?
+
+**Model Context Protocol (MCP)** adalah protokol terbuka yang memungkinkan integrasi mulus antara aplikasi AI (LLM) dengan sumber data dan tool eksternal. MCP distandardisasi oleh Anthropic dan mengikuti pendekatan serupa dengan **Language Server Protocol (LSP)** — bukan menyediakan tool untuk setiap IDE, tetapi menyediakan protokol standar agar tool bisa diakses dari semua AI client.
+
+> **Analogi:** Jika LSP memungkinkan satu language server melayani semua IDE (VSCode, Vim, Emacs), maka MCP memungkinkan satu tool server melayani semua AI client (Claude, GPT, Gemini, Cursor).
+
+### 60.2 Arsitektur MCP
+
+MCP menggunakan arsitektur **client-host-server**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        MCP Host                             │
+│              (Claude Desktop, VS Code, IDE)                 │
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │ MCP Client  │  │ MCP Client  │  │ MCP Client  │  ...   │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘        │
+└─────────┼────────────────┼────────────────┼─────────────────┘
+          │                │                │
+          ▼                ▼                ▼
+    ┌──────────┐    ┌──────────┐    ┌──────────┐
+    │MCP Server│    │MCP Server│    │MCP Server│
+    │ (Tools)  │    │(Resources│    │ (Prompts)│
+    └──────────┘    └──────────┘    └──────────┘
+```
+
+**Komponen Utama:**
+
+| Komponen | Fungsi | Contoh |
+|----------|--------|--------|
+| **MCP Host** | Aplikasi AI yang mengkoordinasi multiple clients | Claude Desktop, VS Code, IDE |
+| **MCP Client** | Komponen yang mempertahankan 1:1 connection dengan server | Dibuat oleh host untuk setiap server |
+| **MCP Server** | Program yang menyediakan context, tools, dan capabilities | File system server, database server, API server |
+
+### 60.3 Primitif MCP (Core Building Blocks)
+
+MCP mendefinisikan 3 primitif utama yang ditawarkan **server** kepada **client**:
+
+#### 1. **Tools** (Fungsi yang Dieksekusi AI)
+Tools adalah fungsi-fungsi yang bisa dipanggil oleh AI untuk melakukan aksi:
+- File operations (baca, tulis, hapus)
+- API calls
+- Database queries
+- Sistem operasi commands
+
+```json
+{
+  "name": "read_file",
+  "description": "Membaca konten file",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "path": {"type": "string", "description": "Path file"}
+    },
+    "required": ["path"]
+  }
+}
+```
+
+#### 2. **Resources** (Data Sources untuk AI)
+Resources adalah sumber data yang menyediakan informasi konteks:
+- File contents
+- Database records
+- API responses
+- Live data streams
+
+#### 3. **Prompts** (Templates untuk Interaksi)
+Prompts adalah template yang bisa digunakan untuk struktur interaksi:
+- System prompts
+- Few-shot examples
+- Workflow templates
+
+### 60.4 Transport Layer (Cara Komunikasi)
+
+MCP menggunakan **JSON-RPC 2.0** sebagai protokol komunikasi, dengan 2 mode transport:
+
+| Mode Transport | Mekanisme | Penggunaan |
+|----------------|-----------|------------|
+| **Stdio** | Standard input/output | Proses lokal (satu mesin) — performa optimal tanpa network overhead |
+| **Streamable HTTP** | HTTP POST + optional SSE | Remote communication — mendukung HTTP authentication (bearer tokens, API keys) |
+
+**Stdio Transport** (paling umum untuk RE tools):
+```
+┌──────────────┐     stdin     ┌──────────────┐
+│  MCP Client  │──────────────▶│  MCP Server  │
+│  (AI App)    │◀──────────────│  (RE Tool)   │
+└──────────────┘     stdout    └──────────────┘
+```
+
+**Streamable HTTP Transport:**
+```
+┌──────────────┐   POST /mcp   ┌──────────────┐
+│  MCP Client  │──────────────▶│  MCP Server  │
+│  (AI App)    │◀──────────────│  (Web API)   │
+└──────────────┘   SSE Stream  └──────────────┘
+```
+
+### 60.5 Protocol Lifecycle
+
+```
+1. Initialization
+   Client ──initialize──▶ Server
+   Server ──initialize response──▶ Client
+   Client ──initialized notification──▶ Server
+
+2. Normal Operation
+   Client ──tools/list──▶ Server     (discover tools)
+   Client ──tools/call──▶ Server     (execute tool)
+   Server ──notification──▶ Client   (status updates)
+
+3. Termination
+   Client ──close()──▶ Server
+```
+
+### 60.6 MCP vs Teknologi Lain
+
+| Aspek | MCP | REST API | gRPC | LSP |
+|-------|-----|----------|------|-----|
+| **Tujuan** | AI ↔ Tool integration | Web services | High-performance RPC | IDE ↔ Language server |
+| **Format** | JSON-RPC 2.0 | HTTP + JSON | Protobuf | JSON-RPC 2.0 |
+| **Transport** | Stdio, HTTP | HTTP | HTTP/2, TCP | Stdio, Socket |
+| **Discovery** | Dynamic (`tools/list`) | OpenAPI spec | Proto files | `initialize` handshake |
+| **Bi-directional** | Ya (sampling, elicitation) | Tidak | Ya (streaming) | Ya (notifications) |
+| **Use Case** | AI agents, copilots | Web APIs | Microservices | Code intelligence |
+
+---
+
+## 61. MCP untuk Reverse Engineering
+
+### 61.1 Ecospoher MCP Reverse Engineering
+
+Terdapat beberapa proyek MCP yang dirancang khusus untuk reverse engineering:
+
+#### 1. **Reversecore MCP** (120 tools)
+URL: https://github.com/sjkim1127/Reversecore_MCP
+
+**Domain tools:**
+
+| Kategori | Tools | Tools Backends |
+|----------|-------|----------------|
+| Static analysis | 24 tools | Radare2, LIEF, DIE, CAPA, Capstone, Binwalk |
+| Dynamic & symbolic | 5 tools | ESIL emulation, angr, taint analysis |
+| Malware analysis | 9 tools | YARA, IOC extraction, vaccine generation |
+| Vulnerability research | 7 tools | ROP gadgets, heap analysis, crash triage |
+| Digital forensics | 8 tools | Volatility3, Scapy, Sleuth Kit |
+| Radare2/r2ghidra | 30 tools | Full r2 integration |
+| Report generation | 14 tools | MITRE ATT&CK, SIGMA rules, VEX |
+
+#### 2. **Revula** (80+ tools)
+URL: https://github.com/afiffebri/revula
+
+**Fitur:**
+- **Binary Parsing:** PE/ELF/Mach-O via LIEF
+- **Disassembly:** Multi-backend (Capstone, radare2, objdump)
+- **String Extraction:** FLOSS integration + 17 classifier patterns
+- **Entropy Analysis:** Shannon entropy dengan sliding window
+- **YARA Scanning:** Inline rules + community rules
+- **Decompilation:** Ghidra, RetDec, Binary Ninja
+- **Android RE:** APK parsing, Frida integration, ADB bridge
+- **Exploit Development:** ROP chain builder, heap exploitation, libc database
+
+#### 3. **IDA MCP** (80+ tools)
+URL: https://github.com/unrealsoftwaredev/ida-mcp
+
+**Domain tools:**
+
+| Domain | Tools | Fungsi |
+|--------|-------|--------|
+| Database | 8 | Open/close IDB, auto-analysis |
+| Functions | 15 | Decompile, disassemble, call graphs |
+| Symbols | 10 | Imports, exports, segments |
+| Strings | 6 | String listing, search, xref mapping |
+| Types | 10 | Structs, enums, typedefs |
+| Cross-References | 8 | Code/data xrefs |
+| Comments | 6 | Regular, repeatable comments |
+| Renaming | 5 | Functions, variables |
+| Patching | 5 | Byte patching, NOP, assemble |
+| Analysis | 8 | Analyzer control |
+| Memory | 5 | Byte/word reads, search |
+| Screenshots | 4 | Pseudocode, disassembly capture |
+
+#### 4. **Ghidra MCP**
+URL: https://github.com/LaurieWired/GhidraMCP
+
+**Fitur:**
+- Decompile dan analyze binaries
+- Rename methods dan data
+- List methods, classes, imports, exports
+- Ghidra plugin + Python MCP bridge
+
+#### 5. **IDA Free MCP** (37 tools, native C++)
+URL: https://github.com/0xshlomil/ida-free-mcp
+
+**Keunggulan:** Implementasi native C++ (bukan Python), lebih cepat
+
+| Group | Tools |
+|-------|-------|
+| Core | int_convert, lookup_funcs, list_funcs, list_globals, imports, find_regex |
+| Analysis | disasm, xrefs_to, callees, callgraph, basic_blocks, find, export_funcs |
+| Memory | get_bytes, get_string, get_int, get_global_value, patch, put_int |
+| Modify | set_comments, rename, patch_asm, define_func, undefine |
+| Types | declare_type, read_struct, search_structs, set_type |
+| Stack | stack_frame, declare_stack, delete_stack |
+| Decompiler | decompile, hexrays_diag, debug_mode |
+
+### 61.2 Pola Implementasi MCP untuk RE Tools
+
+Pola umum implementasi MCP server untuk reverse engineering:
+
+```cpp
+// Contoh: MCP Server untuk disassembler
+#include "mcp_server.h"
+#include "mcp_tool.h"
+
+// 1. Definisikan tools
+mcp::tool disasm_tool = mcp::tool_builder("disassemble")
+    .with_description("Disassemble binary pada alamat tertentu")
+    .with_string_param("file_path", "Path ke binary file")
+    .with_number_param("address", "Alamat awal disassembly")
+    .with_number_param("length", "Jumlah byte", 64)
+    .build();
+
+// 2. Register handler
+server.register_tool(disasm_tool, [](const mcp::json& params, const std::string&) {
+    // Buka binary dengan Radare2/Capstone
+    // Disassemble pada alamat yang diminta
+    // Return hasil dalam format MCP content
+    return mcp::json::array({
+        {{"type", "text"}, {"text", disassembly_result}}
+    });
+});
+
+// 3. Register resources untuk data access
+server.register_resource("re://{filename}/functions", ...);
+server.register_resource("re://{filename}/strings", ...);
+```
+
+---
+
+## 62. Implementasi MCP di OmniByte
+
+### 62.1 Analisis Kelayakan
+
+**Status OmniByte saat ini:**
+- C++17 dengan plugin architecture (IPlugin interface)
+- HydraDis engine: Disassembler, Decompiler, Parser
+- Plugin lifecycle: `onLoad()` → `onRun()` → `onUnload()`
+- Backend: capstone, rizin, lief, rz-ghidra, triton, z3 (placeholder)
+
+**Kelayakan Implementasi MCP:**
+
+| Faktor | Status | Catatan |
+|--------|--------|---------|
+| **Bahasa** | ✅ C++17 | MCP SDK C++ tersedia (cpp-mcp, PhoenixMCP) |
+| **Plugin System** | ✅ Sudah ada | IPlugin interface bisa diadaptasi sebagai MCP tools |
+| **Backend RE** | ⚠️ Placeholder | Perlu enable capstone/rizin/lief dulu |
+| **Transport** | ✅ Stdio | Cocok untuk Android/local process |
+| **Build System** | ✅ CMake | Bisa integrate MCP library via CMake |
+
+### 62.2 Arsitektur yang Direkomendasikan
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     AI Client (Claude, etc)                  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                         Stdio Transport
+                              │
+┌─────────────────────────────────────────────────────────────┐
+│                    OmniByte MCP Server                       │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │                   MCP Layer                           │   │
+│  │  ┌─────────┐  ┌───────────┐  ┌──────────────┐      │   │
+│  │  │ Tools   │  │ Resources │  │ Notifications │      │   │
+│  │  └────┬────┘  └─────┬─────┘  └──────────────┘      │   │
+│  └───────┼──────────────┼───────────────────────────────┘   │
+│          │              │                                    │
+│  ┌───────▼──────────────▼───────────────────────────────┐   │
+│  │              HydraDis Plugin Bridge                   │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐            │   │
+│  │  │ Disasm   │ │ Decomp   │ │ Parser   │            │   │
+│  │  │ Plugin   │ │ Plugin   │ │ Plugin   │            │   │
+│  │  └──────────┘ └──────────┘ └──────────┘            │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │                  Backend Layer                        │   │
+│  │  Capstone │ Rizin │ LIEF │ rz-ghidra │ Triton       │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 62.3 Contoh Implementasi MCP Plugin
+
+```cpp
+// McpDisasmPlugin.h
+#pragma once
+#include "../IPlugin.h"
+#include <mcp_server.h>
+
+namespace omnibyte::hydradis::plugin {
+
+class McpDisasmPlugin : public IPlugin {
+public:
+    std::string name() const override { return "MCP/Disasm"; }
+    std::string version() const override { return "1.0.0"; }
+    std::string description() const override {
+        return "MCP Server plugin: exposes disassembly tools via MCP protocol";
+    }
+
+    bool onLoad() override {
+        // Initialize MCP server
+        mcp::server::configuration config;
+        config.host = "localhost";
+        config.port = 8888;
+        m_server = std::make_unique<mcp::server>(config);
+        m_server->set_server_info("OmniByte-MCP", "1.0.0");
+        m_server->set_capabilities({{"tools", mcp::json::object()}});
+        return true;
+    }
+
+    PluginResult onRun(const PluginContext& ctx) override {
+        // Register tools yang menggunakan HydraDis backend
+        registerDisasmTools(ctx);
+        registerDecompTools(ctx);
+        registerStringTools(ctx);
+
+        // Start MCP server (blocking atau async)
+        m_server->start(true);
+
+        PluginResult result;
+        result.success = true;
+        result.output = "MCP Server started on port 8888";
+        return result;
+    }
+
+    void onUnload() override {
+        if (m_server) m_server->stop();
+    }
+
+private:
+    std::unique_ptr<mcp::server> m_server;
+
+    void registerDisasmTools(const PluginContext& ctx) {
+        auto tool = mcp::tool_builder("disassemble")
+            .with_description("Disassemble binary pada alamat tertentu")
+            .with_string_param("address", "Alamat hex (contoh: 0x1000)")
+            .with_number_param("length", "Jumlah instruksi", 50)
+            .build();
+
+        m_server->register_tool(tool, [&ctx](const mcp::json& params, const std::string&) {
+            // Gunakan Capstone via IDisassembler
+            std::string addr = params["address"];
+            int length = params.value("length", 50);
+            // ... disassembly logic ...
+            return mcp::json::array({
+                {{"type", "text"}, {"text", disassembly_result}}
+            });
+        });
+    }
+};
+
+} // namespace omnibyte::hydradis::plugin
+```
+
+### 62.4 Tools yang Bisa Diekspos via MCP
+
+| Tool | Fungsi | Input | Output |
+|------|--------|-------|--------|
+| `disassemble` | Disassemble binary | address, length | Assembly instructions |
+| `decompile` | Decompile fungsi | function_name | Pseudocode C |
+| `list_functions` | List semua fungsi | - | Function list |
+| `list_strings` | Extract strings | min_length | String list |
+| `parse_binary` | Parse header/sections | - | Binary info |
+| `analyze_imports` | Analyze import table | - | Import list |
+| `find_pattern` | Cari pattern | pattern, section | Alamat match |
+| `get_xrefs` | Cross-references | address | Xref list |
+
+### 62.5 Langkah Implementasi
+
+1. **Enable Backend** — Uncomment `find_package` untuk capstone/rizin/lief di CMakeLists.txt
+2. **Add MCP Library** — Integrasikan cpp-mcp atau PhoenixMCP via CMake `FetchContent` atau `add_subdirectory`
+3. **Create MCP Plugin** — Implement `IPlugin` yang mendaftarkan tools ke MCP server
+4. **Add Transport** — Stdio transport untuk integrasi dengan AI clients
+5. **Testing** — Test dengan Claude Desktop atau MCP client lain
+
+### 62.6 Manfaat MCP di OmniByte
+
+| Manfaat | Deskripsi |
+|---------|-----------|
+| **AI-Powered Analysis** | User bisa bicara dengan AI tentang binary yang dianalisis |
+| **Natural Language Queries** | "Apa fungsi yang panggil strcpy?" → AI panggil `get_xrefs` tool |
+| **Automated Workflows** | AI bisa chain multiple tools untuk analisis kompleks |
+| **Integration** | Terhubung dengan Claude, GPT, Gemini, atau AI client lain |
+| **Extensible** | Plugin baru bisa ditambah tanpa ubah MCP server core |
+
 ---
 
 **Dokumen ini merupakan bagian dari proyek Pengembangan OmniByte dan disusun sebagai referensi teknis untuk tim pengembang.**
 
-**Terakhir diperbarui:** 2026-09-11
-**Revisi:** 4.4
+**Terakhir diperbarui:** 2026-09-12
+**Revisi:** 4.5
