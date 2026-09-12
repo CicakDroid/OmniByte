@@ -467,4 +467,455 @@ Kernel Source (e.g., OnePlus kernel source)
 
 ---
 
+## 7. libsu Programmatic Root Access
+
+### Ringkasan
+libsu (topjohnwu) adalah Java library yang menyediakan **programmatic root access** — artinya app bisa menjalankan root commands dari Java/Kotlin code tanpa user harus manual ketik di terminal.
+
+**Koreksi umum**: libsu **TIDAK embed su binary ke APK**. Yang dilakukan:
+```
+App (OmniByte) → panggil "su" → root shell process → execute commands
+                    ↑
+              su binary dari Magisk/KernelSU/SukiSU (sudah terinstall di device)
+```
+
+### Sumber Resmi
+- **Repository:** https://github.com/topjohnwu/libsu
+- **Author:** topjohnwu (Magisk author)
+- **Stars:** 8.1k
+- **Versi terakhir:** v6.0.0
+- **Install:** JitPack (`com.github.topjohnwu.libsu:core:6.0.0`, `:service:6.0.0`)
+
+### Arsitektur
+
+```
+┌─────────────────────────────────────────────────────┐
+│  OmniByte App Process (com.omnibyte.app)            │
+│                                                     │
+│  Shell.cmd("cat /proc/1/maps").exec()               │
+│       │                                             │
+│       ▼                                             │
+│  Shell.Builder.build()                              │
+│       │                                             │
+│       ├── Coba: Runtime.exec("su")                  │
+│       │         → root shell process (uid=0)        │
+│       │                                             │
+│       └── Fallback: Runtime.exec("sh")              │
+│                 → non-root shell (uid=app_uid)      │
+│                                                     │
+│  Root shell execute: cat /proc/1/maps               │
+│  Return: Shell.Result { stdout, stderr, exitCode }  │
+└─────────────────────────────────────────────────────┘
+```
+
+### Level 1: Shell API (_root shell execution_)
+
+Dari Java/Kotlin code, app bisa execute root commands tanpa user intervensi:
+
+```kotlin
+// Static API — jalankan command di root shell utama
+val result = Shell.cmd("cat /proc/$pid/maps").exec()
+val maps = result.out  // list of memory mappings
+val exitCode = result.code
+
+// Chained commands
+Shell.cmd("su -c 'ls -la /data'").exec()
+
+// Async execution
+Shell.cmd("cat /proc/kallsyms").exec { result ->
+    // Callback when done
+}
+```
+
+**Key classes:**
+- `Shell` — manages a Unix shell process (root atau non-root)
+- `Shell.Builder` — configure shell creation behavior
+- `Shell.Result` — stdout, stderr, exitCode dari executed commands
+- `Shell.Job` — async shell job
+
+### Level 2: RootService (_root process dengan IPC_)
+
+Jalankan Java/Kotlin/C++ code di **root process** via Binder IPC:
+
+```
+┌──────────────────────┐          ┌──────────────────────────┐
+│  OmniByte App        │  Binder  │  Root Service Process    │
+│  (non-root)          │◄────────►│  (uid=0, root)           │
+│                      │   IPC    │                          │
+│  // Client side      │          │  // Runs as root         │
+│  RootService.bind()  │          │  RootService.onBind()    │
+│                      │          │  └─ load native lib      │
+│                      │          │  └─ execute C++ code     │
+└──────────────────────┘          └──────────────────────────┘
+```
+
+**Use case untuk OmniByte:**
+- MemoryIO operations (read/write target process memory)
+- ProcessManager (inspect/modify target process)
+- SymbolResolver (resolve symbols di process memory)
+- ZigZag stealth operations
+
+```kotlin
+// Server side — runs in root process
+class HookService : RootService() {
+    override fun onBind(intent: Intent): IBinder {
+        System.loadLibrary("omnibyte_native")  // Load C++ code
+        return HookBinder.Stub.asInterface(this)
+    }
+}
+
+// Client side — bind dari app
+RootService.bind(intent, object : ServiceConnection {
+    override fun onServiceConnected(name: ComponentName, service: IBinder) {
+        val hookBinder = HookBinder.Stub.asInterface(service)
+        hookBinder.attachToProcess(targetPid)  // Execute with root
+    }
+})
+```
+
+### Level 3: Remote NIO (_root file I/O_)
+
+```java
+// Dari app process (non-root)
+ExtendedFile boot = remoteFS.getFile("/dev/block/by-name/boot");
+InputStream in = boot.newInputStream();  // akses via root process
+```
+
+### Programmatic vs Manual
+
+| Manual (tanpa libsu) | Programmatic (dengan libsu) |
+|---|---|
+| User buka terminal, ketik `su` | App otomatis panggil `su` saat startup |
+| User ketik command manual | App execute command dari Kotlin/Java code |
+| User copy-paste output | App baca output via `Shell.Result` |
+| Tidak bisa integrate ke UI | Root operations integrate ke app flow |
+
+### Alur: App → Root Access
+
+```
+User buka OmniByte
+    │
+    ▼
+SplashActivity: Shell.getShell(callback)
+    │
+    ▼
+Shell.Builder.build():
+    ├── 1. exec("su") → SUCCESS → root shell created
+    │       ↓
+    │   Shell.getStatus() == ROOT_SHELL
+    │   Shell.isRoot() == true
+    │
+    └── 2. exec("su") → FAILED → exec("sh") → non-root
+            ↓
+        Shell.getStatus() == NON_ROOT_SHELL
+        Shell.isRoot() == false
+    │
+    ▼
+App sekarang bisa:
+    ├── Shell.cmd("...").exec()        ← root commands
+    ├── RootService.bind(...)          ← root process
+    └── Shell.isAppGrantedRoot()       ← cek status
+```
+
+### Setup untuk OmniByte
+
+**Opsi A: Gradle Dependency (recommended)**
+```kotlin
+// gradle/libs.versions.toml
+[versions]
+libsu = "6.0.0"
+
+[libraries]
+libsu-core = { group = "com.github.topjohnwu.libsu", name = "core", version.ref = "libsu" }
+libsu-service = { group = "com.github.topjohnwu.libsu", name = "service", version.ref = "libsu" }
+
+// app/build.gradle.kts
+dependencies {
+    implementation(libs.libsu.core)
+    implementation(libs.libsu.service)
+}
+```
+
+**Opsi B: Source Embed**
+```
+common/
+├── Math/
+├── Serialization/
+└── libsu/          ← clone atau copy source di sini
+    ├── core/
+    └── service/
+```
+
+**Location**: `common/` directory (sejajar Math/, Serialization/) jika embed source.
+
+---
+
+## 8. Root Strategies: Tiered Approach
+
+### 3-Tier Root Access Strategy
+
+| Tier | Strategy | Requires | Success Rate | Notes |
+|------|----------|----------|--------------|-------|
+| **1** | Boot Image Patching | Unlocked Bootloader + Root Manager | 99% (device compatible) | Magisk, KernelSU, SukiSU-Ultra |
+| **2** | Kernel Exploit | Unlocked Bootloader | Device-specific | shizuku, KernelSU without manager |
+| **3** | Virtual Environment | None (app-level) | Limited | Parallel Space, VMOS, VirtualXposed |
+
+### Tier 1: Boot Image Patching (Most Common)
+```
+User has:
+  ├── Unlocked Bootloader (OEM unlock via fastboot)
+  ├── Custom Recovery (TWRP) atau Flash via KernelSU app
+  └── Root Manager (Magisk/KernelSU/SukiSU-Ultra)
+
+Flash flow:
+  boot.img → patch → new boot.img → flash via recovery/app
+```
+
+**Supported managers:**
+- Magisk (topjohnwu) — most universal
+- KernelSU-Next — kernel-level, better hiding
+- SukiSU-Ultra — fork with SUSFS, enhanced stealth
+
+### Tier 2: Kernel Exploit
+```
+User has:
+  ├── Unlocked Bootloader (but no root manager installed)
+  └── Specific device + kernel version
+
+Exploit:
+  kernel vulnerability → gain root → install root manager
+```
+
+**Examples:**
+- CVE-2021-1048 (efuse) — Samsung devices
+- CVE-2023-26083 (GPU) — Qualcomm devices
+- Per-device, per-kernel version — not universal
+
+### Tier 3: Virtual Environment (No Root Required)
+```
+User has:
+  ├── Unlocked Bootloader (or even locked)
+  └── Virtual environment app
+
+Virtual env:
+  Parallel Space / VMOS / VirtualXposed
+  → Runs app in isolated container
+  → Container has root access (built-in)
+  → Target app thinks it's rooted
+```
+
+**Limitations:**
+- Performance overhead (full VM/container)
+- Not all apps work in virtual environment
+- Detection by advanced anti-cheat (GameGuardian can detect)
+
+### Locked Bootloader: The Hard Limit
+
+| Scenario | Root Possible? | Notes |
+|----------|----------------|-------|
+| Unlocked BL + Root Manager | ✅ Yes | Standard approach |
+| Unlocked BL + No Root | ✅ Yes | Install root manager |
+| Locked BL + Kernel Exploit | ⚠️ Device-specific | Need known CVE |
+| Locked BL + No Exploit | ❌ No universal solution | All public exploits patched |
+| Fully locked (Samsung Knox, Pixel Titan) | ❌ No | Hardware-backed security |
+
+**Conclusion**: Locked bootloader + no known kernel exploit = **tidak ada solusi universal**.
+
+---
+
+## 9. GameGuardian Mechanics
+
+### Cara Kerja GameGuardian
+
+GameGuardian adalah memory editor untuk game. Memahami mekanismenya membantu OmniByte design anti-detection.
+
+### Root Mode (Standard)
+
+```
+┌─────────────────────────────────────────────────────┐
+│  GameGuardian Process (root)                        │
+│                                                     │
+│  1. ptrace(PTRACE_ATTACH, target_pid)              │
+│     → Attach ke target game process                 │
+│                                                     │
+│  2. open("/proc/<pid>/mem", O_RDWR)                │
+│     → Buka direct memory access                     │
+│                                                     │
+│  3. lseek() + read()/write()                        │
+│     → Read/write game memory values                 │
+│                                                     │
+│  4. Search for values (scan memory)                 │
+│     → Find game variables (health, gold, etc.)     │
+│                                                     │
+│  5. Modify values                                   │
+│     → Write new values ke memory                    │
+└─────────────────────────────────────────────────────┘
+```
+
+**Key operations:**
+- `ptrace()` — attach ke target process
+- `/proc/<pid>/mem` — direct memory access
+- `lseek()` + `read()`/`write()` — scan and modify memory
+
+### Non-Root Mode (Virtual Environment)
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Parallel Space / VMOS / VirtualXposed              │
+│                                                     │
+│  1. Create virtual container                        │
+│     → Isolated Android environment                  │
+│                                                     │
+│  2. Install both:                                   │
+│     ├── GameGuardian (inside container)             │
+│     └── Target Game (inside container)              │
+│                                                     │
+│  3. Container has built-in root                     │
+│     → GameGuardian gets root inside container       │
+│                                                     │
+│  4. Container-level isolation                       │
+│     → Real device doesn't see root                  │
+│     → Game thinks it's in normal environment        │
+└─────────────────────────────────────────────────────┘
+```
+
+**Key insight**: Virtual environment provides root **inside the container** without root on real device.
+
+### Detection Vectors
+
+| Vector | How It Works | Bypass Difficulty |
+|--------|--------------|-------------------|
+| `/proc/self/maps` | Check for suspicious memory mappings | Medium |
+| `ptrace` detection | Check if process is being traced | Medium |
+| `/proc/<pid>/status` | Check TracerPid field | Medium |
+| SELinux context | Check process context | Hard |
+| Signature check | Verify file signatures | Hard |
+| Kernel module check | Check loaded kernel modules | Very Hard |
+
+### Relevansi untuk OmniByte
+
+GameGuardian pattern shows:
+1. **Root mode**: Direct ptrace + `/proc/<pid>/mem` — **what ZigZag backends do**
+2. **Non-root mode**: Virtual environment — **alternative strategy for unrooted devices**
+3. **Detection vectors**: What anti-cheat looks for — **what ZigZag stealth must bypass**
+
+---
+
+## 10. Virtual Environment Strategy untuk OmniByte
+
+### Concept
+
+Seperti GameGuardian, OmniByte bisa menjalankan operasi runtime di dalam virtual environment untuk device yang tidak rooted.
+
+### Potensial Virtual Environment
+
+| Tool | Type | Root Built-in | Detection Risk | Notes |
+|------|------|---------------|----------------|-------|
+| **Parallel Space** | App cloner | Yes (in container) | Medium | Popular, but detectable |
+| **VMOS** | Full VM | Yes (in VM) | Low | Heavy, full Android in Android |
+| **VirtualXposed** | Xposed framework | Yes | Medium | For Xposed modules |
+| **DroidSpaces** | Lightweight container | Configurable | Low | Newer, less detection |
+
+### Architecture Option
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Real Device (unrooted)                             │
+│                                                     │
+│  ┌─────────────────────────────────────────────┐   │
+│  │  Virtual Container (VMOS/DroidSpaces)       │   │
+│  │                                             │   │
+│  │  ┌─────────────────────────────────────┐   │   │
+│  │  │  OmniByte Runtime (inside container)│   │   │
+│  │  │                                     │   │   │
+│  │  │  ├── ZigZag Manager                 │   │   │
+│  │  │  ├── Backend Adapters               │   │   │
+│  │  │  ├── ProcessManager                 │   │   │
+│  │  │  └── MemoryIO                       │   │   │
+│  │  │                                     │   │   │
+│  │  │  Root access: BUILT-IN (container)  │   │   │
+│  │  └─────────────────────────────────────┘   │   │
+│  │                                             │   │
+│  │  ┌─────────────────────────────────────┐   │   │
+│  │  │  Target App (game/process)          │   │   │
+│  │  └─────────────────────────────────────┘   │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                     │
+│  Real device: NO ROOT                               │
+│  Container: HAS ROOT                                │
+└─────────────────────────────────────────────────────┘
+```
+
+### Limitations
+
+1. **Performance overhead** — full VM adds latency
+2. **Compatibility** — not all apps run in containers
+3. **Detection** — advanced anti-cheat can detect virtual environments
+4. **Resource usage** — container consumes significant RAM/CPU
+
+### Decision Matrix
+
+| Scenario | Recommended Strategy |
+|----------|---------------------|
+| User has rooted device | Use ZigZag with root (standard) |
+| User has unrooted + unlocked BL | Suggest boot patching (Tier 1) |
+| User has unrooted + locked BL | Virtual environment (Tier 3) — if feasible |
+| User wants stealth | ZigZag + SUSFS on rooted device |
+
+---
+
+## 11. OmniByte Integration Strategy
+
+### Root Access Flow
+
+```
+app/src/main/java/com/omnibyte/app/
+├── RootInitializer.kt          ← Shell.getShell() di splash screen
+├── runtime/
+│   ├── RootShell.kt            ← wrapper Shell.cmd() untuk memory ops
+│   └── HookService.kt          ← RootService untuk native code
+```
+
+### Initialization Sequence
+
+```
+SplashActivity
+    │
+    ├── Shell.getShell(callback)
+    │       ↓
+    │   Shell.Builder.build()
+    │       ├── try "su" → root shell
+    │       └── fallback "sh" → non-root
+    │
+    ├── Update UI based on root status
+    │   ├── Root: Show full features
+    │   └── Non-root: Show limited features + suggest virtual env
+    │
+    └── Initialize ZigZag Manager
+            ├── Load backends based on config
+            ├── Set priority order
+            └── Ready for stealth operations
+```
+
+### Backend Selection Based on Root Status
+
+| Root Status | Available Backends | Recommended |
+|-------------|-------------------|-------------|
+| Root shell | All (Diamorphine, Bypasser, etc.) | ZigZag with priority |
+| Non-root | Virtual environment only | VMOS/DroidSpaces |
+| No root, no env | None | Show error/suggestion |
+
+---
+
 **Terakhir diperbarui:** 2026-09-06
+**Research Topics Covered:**
+1. AnyKernel3
+2. WildKernels/GKI_KernelSU_SUSFS
+3. Numbersf/Action-Build
+4. MMRLApp/DEXMO
+5. Root Hiding Frameworks (8 projects)
+6. libsu Programmatic Root Access
+7. Root Strategies (3-tier approach)
+8. GameGuardian Mechanics
+9. Virtual Environment Strategy
+10. OmniByte Integration Strategy
