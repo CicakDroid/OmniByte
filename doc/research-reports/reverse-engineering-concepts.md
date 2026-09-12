@@ -3337,6 +3337,40 @@ auto bestMatch = registry.detectBestMatch(target);
 79. LaurieWired, "GhidraMCP: MCP server for Ghidra," GitHub, https://github.com/LaurieWired/GhidraMCP
 80. 0xshlomil, "ida-free-mcp: Native C++ IDA MCP plugin," GitHub, https://github.com/0xshlomil/ida-free-mcp
 
+### Assembly Language
+81. ARM, "ARM Architecture Reference Manual," https://developer.arm.com/documentation/ddi0602/
+82. Intel, "Intel 64 and IA-32 Architectures Software Developer Manuals," https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
+83. Capstone, "Capstone Disassembly Framework," https://www.capstone-engine.org/
+84. Keystone, "Keystone Assembler Framework," https://www.keystone-engine.org/
+
+### Codegen & Compiler
+85. LLVM, "LLVM Target-Independent Code Generator," https://llvm.org/docs/CodeGenerator.html
+86. Cranelift, "Cranelift Code Generator," https://cranelift.dev/
+87. GCC, "GNU Compiler Collection Internals," https://gcc.gnu.org/onlinedocs/gccint/
+
+### eBPF
+88. Isovalent, "eBPF Documentation," https://docs.ebpf.io/
+89. Brendan Gregg, "BPF Performance Tools," https://www.brendangregg.com/bpf-performance-tools-book.html
+90. libbpf, "libbpf: eBPF library," https://github.com/libbpf/libbpf
+91. bcc, "BPF Compiler Collection," https://github.com/iovisor/bcc
+92. bpftrace, "High-level tracing language for Linux," https://github.com/bpftrace/bpftrace
+
+### WebAssembly (Wasm)
+93. WebAssembly, "WebAssembly Specification," https://webassembly.org/specs/
+94. W3C, "WebAssembly Core Specification 2.0," https://www.w3.org/TR/wasm-core-2/
+95. wasmtime, "Wasmtime: WebAssembly Runtime," https://wasmtime.dev/
+96. wasmer, "Wasmer: WebAssembly Runtime," https://wasmer.io/
+97. wabt, "WebAssembly Binary Toolkit," https://github.com/WebAssembly/wabt
+98. Emscripten, "Emscripten: Compile C/C++ to Wasm," https://emscripten.org/
+99. AssemblyScript, "TypeScript-like language targeting Wasm," https://www.assemblyscript.org/
+100. WASI, "WebAssembly System Interface," https://wasi.dev/
+
+### WebP Image Format
+101. Google, "WebP: An image format for the Web," https://developers.google.com/speed/webp
+102. libwebp, "WebP codec library," https://chromium.googlesource.com/webm/libwebp
+103. WebP Container Specification, "WebP Container Specification," https://developers.google.com/speed/webp/docs/riff_container
+104. Google, "Animation in WebP," https://developers.google.com/speed/webp/animation
+
 ---
 
 ## 60. Model Context Protocol (MCP)
@@ -3741,7 +3775,719 @@ private:
 
 ---
 
+## 63. Assembly Language (ASM)
+
+### 63.1 Apa itu Assembly Language?
+
+**Assembly Language (ASM)** adalah bahasa pemrograman level rendah yang merupakan representasi hampir-setara dari **machine code** (kode mesin). Setiap instruksi ASM biasanya berkorespondensi satu-lawan-satu dengan instruksi binary yang dieksekusi oleh CPU.
+
+> **Analogi:** Jika C++ adalah "bahasa manusia" yang bisa dibaca programmer, ASM adalah "bahasa biner yang diberi label" — masih sangat rendah, tapi setidaknya punya nama yang bisa dibaca (mov, add, jmp).
+
+### 63.2 Cara Kerja Assembly
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Assembly Pipeline                         │
+│                                                              │
+│  Source Code (C/C++)                                        │
+│       │                                                      │
+│       ▼                                                      │
+│  Preprocessor (#include, #define)                           │
+│       │                                                      │
+│       ▼                                                      │
+│  Compiler (clang/gcc)                                       │
+│       │                                                      │
+│       ▼                                                      │
+│  Assembly Source (.s)  ←── INI ASM                          │
+│       │                                                      │
+│       ▼                                                      │
+│  Assembler (as)                                             │
+│       │                                                      │
+│       ▼                                                      │
+│  Object File (.o)  ←── Binary + metadata                   │
+│       │                                                      │
+│       ▼                                                      │
+│  Linker (ld)                                                │
+│       │                                                      │
+│       ▼                                                      │
+│  Executable (.so / ELF / PE)  ←── Machine Code             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 63.3 Contoh Assembly (ARM64/AArch64)
+
+```asm
+; ARM64 Assembly - Simple function
+; int add(int a, int b) { return a + b; }
+
+.global add
+add:
+    ; Prolog
+    stp     x29, x30, [sp, #-16]!   ; Simpan frame pointer & return address
+    mov     x29, sp                   ; Set frame pointer
+
+    ; Body
+    add     w0, w0, w1               ; w0 = a + b (return value di w0)
+
+    ; Epilog
+    ldp     x29, x30, [sp], #16     ; Restore frame pointer & return address
+    ret                              ; Return ke caller
+```
+
+**Penjelasan Instruksi ARM64:**
+
+| Instruksi | Fungsi | Keterangan |
+|-----------|--------|------------|
+| `stp` | Store Pair | Simpan 2 register ke stack sekaligus |
+| `ldp` | Load Pair | Muat 2 register dari stack |
+| `mov` | Move | Salin nilai antar register |
+| `add` | Add | Penjumlahan |
+| `ret` | Return | Kembali ke caller |
+
+### 63.4 Perbandingan Assembly
+
+| Aspek | x86 (Intel/AMD) | ARM64 (AArch64) | RISC-V |
+|-------|-----------------|-----------------|--------|
+| **Philosophy** | CISC (complex) | RISC (simple) | RISC (modular) |
+| **Register** | 16 umum | 31 umum | 32 umum |
+| **Panjang Instruksi** | Variable (1-15 bytes) | Fixed (4 bytes) | Fixed (4 bytes) |
+| **Endianness** | Little-endian | Little-endian | Little-endian |
+| **Instruksi untuk memori** | Banyak (load/store, arithmetic) | Load/store only | Load/store only |
+| **Condition Codes** | Flags register | Condition flags | Tidak ada (pakai branch) |
+
+### 63.5 Assembly untuk Reverse Engineering
+
+**Mengapa ASM penting untuk RE:**
+
+1. **Pemahaman Terakhir** — Decompiler kadang salah, ASM adalah kebenaran
+2. **Identifikasi Pola** — Function prolog/epilog, calling convention
+3. **Debugging** — Stepping instruction-by-instruction
+4. **Malware Analysis** — Understanding shellcode, obfuscation
+5. **Exploit Development** — ROP chains, buffer overflow payloads
+
+**ASM Pattern Recognition untuk RE:**
+
+```asm
+; === Function Prolog Pattern ===
+stp     x29, x30, [sp, #-0x20]!    ; Frame setup
+mov     x29, sp
+
+; === Syscall Pattern (Linux ARM64) ===
+mov     x8, #221                    ; Syscall number (execve)
+svc     #0                          ; Supervisor call
+
+; === Virtual Function Call Pattern (C++) ===
+ldr     x8, [x0]                    ; Load vtable pointer
+ldr     x9, [x8, #16]               ; Load method at offset 16
+blr     x9                          ; Call via function pointer
+
+; === Anti-Debug Pattern ===
+mov     x0, #0                      ; PTRACE_TRACEME
+mov     x8, #117                    ; ptrace syscall number
+svc     #0
+cbz     x0, .debugged               ; If 0, we're being traced
+```
+
+### 63.6 Implementasi di OmniByte
+
+**Status Saat Ini:**
+- OmniByte sudah menggunakan **Capstone** sebagai disassembler backend
+- Capstone mendukung: ARM, ARM64, x86, MIPS, PowerPC, SPARC, SystemZ, XCore
+- Plugin `DisassemblerPlugin` sudah ada di HydraDis
+
+**Yang Sudah Ada:**
+```
+engine-core/HydraDis/
+├── Plugin/
+│   └── Enhanced/
+│       ├── Signatures/     ← Pattern matching pada ASM
+│       └── FunctionResolver/ ← Analisis calling convention
+└── Backend/
+    └── capstone/           ← Disassembler engine
+```
+
+**Rekomendasi Implementasi:**
+- **ASM Highlighter** — Syntax highlighting untuk ARM64/x86
+- **CFG Builder dari ASM** — Control flow graph dari assembly
+- **Pattern Scanner** — Cari pola ASM tertentu (signature matching)
+- **Assembly Editor** — Patch instruction langsung
+
+---
+
+## 64. Codegen (Code Generation)
+
+### 64.1 Apa itu Codegen?
+
+**Code Generation (Codegen)** adalah proses mengubah representasi intermediate (IR) dari program menjadi kode target (assembly, bytecode, atau machine code). Codegen adalah fase terakhir dalam pipeline compiler.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Compiler Pipeline                         │
+│                                                              │
+│  Source Code (C++, Rust, etc.)                              │
+│       │                                                      │
+│       ▼                                                      │
+│  Frontend (Parser + Semantic Analysis)                      │
+│       │                                                      │
+│       ▼                                                      │
+│  AST (Abstract Syntax Tree)                                 │
+│       │                                                      │
+│       ▼                                                      │
+│  IR Generator                                               │
+│       │                                                      │
+│       ▼                                                      │
+│  Intermediate Representation (LLVM IR, MIR, etc.)          │
+│       │                                                      │
+│       ▼                                                      │
+│  Optimizer (dead code elimination, inlining, etc.)          │
+│       │                                                      │
+│       ▼                                                      │
+│  Optimized IR                                               │
+│       │                                                      │
+│       ▼                                                      │
+│  CODEGEN ←── Fokus bagian ini                              │
+│       │                                                      │
+│       ▼                                                      │
+│  Target Code (ARM64 ASM, x86 ASM, LLVM IR, WebAssembly)   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 64.2 Cara Kerja Codegen
+
+#### Langkah 1: Instruction Selection
+```cpp
+// Input: LLVM IR
+%result = add i32 %a, %b
+
+// Codegen untuk ARM64
+add w0, w0, w1      // Pilih instruksi ADD untuk ARM64
+
+// Codegen untuk x86
+add eax, ebx        // Pilih instruksi ADD untuk x86
+```
+
+#### Langkah 2: Register Allocation
+```
+// Sebelum: Banyak variabel virtual
+v1 = a + b
+v2 = c * d
+v3 = v1 + v2
+
+// Sesudah: Register allocation
+w0 = a + b          // Map v1 → w0
+w1 = c * d          // Map v2 → w1
+w0 = w0 + w1        // Map v3 → w0 (reuse v1)
+```
+
+#### Langkah 3: Instruction Scheduling
+```
+// Sebelum: Dependency chain
+ldr w0, [x1]        // Load a
+add w0, w0, w2      // Use a → stall jika belum ready
+
+// Sesudah: Interleave independent instructions
+ldr w0, [x1]        // Load a
+ldr w3, [x4]        // Load c (independent)
+add w0, w0, w2      // Use a (now ready)
+add w5, w3, w6      // Use c (now ready)
+```
+
+#### Langkah 4: Frame Layout
+```
+┌─────────────────────┐ ← SP (Stack Pointer)
+│    Return Address   │
+│    Saved Registers  │
+│    Local Variables  │
+│    Function Args    │
+└─────────────────────┘ ← FP (Frame Pointer)
+```
+
+### 64.3 Codegen Frameworks
+
+| Framework | Bahasa | Target | Penggunaan |
+|-----------|--------|--------|------------|
+| **LLVM** | C++ | ARM, x86, MIPS, WebAssembly | GCC, Clang, Rust |
+| **GCC** | C++ | ARM, x86, PowerPC, RISC-V | GCC compiler |
+| **Rust Compiler** | Rust | LLVM IR | Rust language |
+| **Wasmtime/Cranelift** | Rust | WebAssembly | WASM runtime |
+| **Lionet AI** | OCaml | x86, ARM | Formal verification |
+
+### 64.4 Codegen untuk Reverse Engineering
+
+**Mengapa Codegen penting untuk RE:**
+
+1. **Decompilation** — Mengubah binary kembali ke kode sumber (inverse codegen)
+2. **Lifting** — Mengubah machine code ke IR (seperti LLVM IR) untuk analisis
+3. **Transpilation** — Mengubah assembly ke bahasa tingkat tinggi
+4. **Binary Translation** — Mengubah binary untuk platform berbeda
+
+**Inverse Codegen (Decompilation):**
+```
+Machine Code (ARM64)
+    │
+    ▼
+Disassembly (Capstone)
+    │
+    ▼
+Lift to IR (LLVM IR / VEX IR)
+    │
+    ▼
+Simplify IR (optimize, normalize)
+    │
+    ▼
+C/C++ Pseudocode
+```
+
+### 64.5 Implementasi di OmniByte
+
+**Status Saat Ini:**
+- OmniByte menggunakan **rz-ghidra** sebagai decompiler backend
+- rz-ghidra melakukan inverse codegen: Assembly → Ghidra IR → Pseudocode
+- Plugin `DecompilerPlugin` sudah ada
+
+**Yang Sudah Ada:**
+```
+engine-core/HydraDis/
+├── Plugin/
+│   └── Enhanced/
+│       └── SymbolicExecution/ ← Menggunakan Triton untuk lifting
+└── Backend/
+    └── rz-ghidra/           ← Decompiler (inverse codegen)
+```
+
+**Rekomendasi Implementasi:**
+- **LLVM Lifting** — Lift ARM64/x86 ke LLVM IR untuk analisis lebih lanjut
+- **CFG dari IR** — Control flow graph dari intermediate representation
+- **Type Recovery** — Rekonstruksi tipe dari machine code
+- **Optimization Pass** — Apply optimizer untuk simplifikasi code
+
+---
+
+## 65. eBPF (Extended Berkeley Packet Filter)
+
+### 65.1 Apa itu eBPF?
+
+**eBPF (Extended Berkeley Packet Filter)** adalah teknologi yang memungkinkan menjalankan program-program kecil (sandboxed) di dalam **kernel Linux** tanpa perlu memodifikasi kernel atau memuat modul kernel. Awalnya dirancang untuk filter packet, sekarang digunakan untuk observability, keamanan, dan jaringan.
+
+> **Analogi:** eBPF seperti "plugin system untuk kernel Linux" — kamu bisa menambahkan fungsionalitas baru ke kernel tanpa recompile.
+
+### 65.2 Cara Kerja eBPF
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    eBPF Architecture                         │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │                   User Space                         │   │
+│  │                                                      │   │
+│  │  ┌──────────────┐    ┌──────────────┐              │   │
+│  │  │ eBPF Program │    │  Userspace   │              │   │
+│  │  │ (C/Rust)     │    │  Library     │              │   │
+│  │  └──────┬───────┘    └──────┬───────┘              │   │
+│  └─────────┼────────────────────┼──────────────────────┘   │
+│            │                    │                            │
+│            ▼                    ▼                            │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │                   Kernel Space                       │   │
+│  │                                                      │   │
+│  │  ┌──────────────┐    ┌──────────────┐              │   │
+│  │  │   Verifier   │    │  JIT         │              │   │
+│  │  │   (Safety    │    │  Compiler    │              │   │
+│  │  │    Check)    │    │  (Native)    │              │   │
+│  │  └──────┬───────┘    └──────┬───────┘              │   │
+│  │         │                    │                        │   │
+│  │         ▼                    ▼                        │   │
+│  │  ┌──────────────────────────────────────┐           │   │
+│  │  │         eBPF Runtime                  │           │   │
+│  │  │   • Hook ke kernel functions         │           │   │
+│  │  │   • Akses maps (shared memory)       │           │   │
+│  │  │   • Helper functions                  │           │   │
+│  │  └──────────────────────────────────────┘           │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 65.3 Komponen eBPF
+
+| Komponen | Fungsi |
+|----------|--------|
+| **eBPF Program** | Program C/Rust yang dikompilasi ke bytecode eBPF |
+| **Verifier** | Memastikan program aman (no infinite loops, no illegal memory access) |
+| **JIT Compiler** | Mengubah bytecode eBPF ke native machine code |
+| **Maps** | Shared memory antara user space dan kernel space |
+| **Helper Functions** | API yang disediakan kernel untuk eBPF program |
+| **Hook Points** | Titik di kernel tempat eBPF bisa di-attach |
+
+### 65.4 Contoh eBPF Program
+
+```c
+// eBPF program untuk trace syscall
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
+
+// Map untuk menyimpan data
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 1024);
+    __type(key, __u32);    // PID
+    __type(value, __u64);  // Timestamp
+} syscall_count SEC(".maps");
+
+// Tracepoint hook untuk syscall enter
+SEC("tracepoint/raw_syscalls/sys_enter")
+int trace_syscall(struct trace_event_raw_sys_enter *ctx) {
+    __u32 pid = bpf_get_current_pid_tgid() >> 32;
+    __u64 ts = bpf_ktime_get_ns();
+    
+    bpf_map_update_elem(&syscall_count, &pid, &ts, BPF_ANY);
+    
+    char fmt[] = "PID %d made syscall\n";
+    bpf_trace_printk(fmt, sizeof(fmt), pid);
+    
+    return 0;
+}
+
+char LICENSE[] SEC("license") = "GPL";
+```
+
+### 65.5 eBPF untuk Reverse Engineering
+
+**Mengapa eBPF berguna untuk RE:**
+
+1. **Dynamic Analysis** — Trace syscall, function calls, memory access
+2. **Behavioral Monitoring** — Monitor perilaku program tanpa slowdown
+3. **Malware Analysis** — Deteksi suspicious activity di runtime
+4. **Network Analysis** — Intercept network traffic
+5. **Forensics** — Collect artifacts saat program berjalan
+
+**Use Case eBPF untuk RE:**
+
+| Use Case | Tool | Fungsi |
+|----------|------|--------|
+| **Syscall Tracing** | bpftrace, strace | Trace semua syscall dari target |
+| **Function Tracing** | bcc-tools | Trace internal kernel function |
+| **Network Monitoring** | tcpdump (eBPF) | Intercept network packet |
+| **Memory Access** | bpftrace | Monitor read/write ke memory |
+| **Security Audit** | Falco | Deteksi suspicious behavior |
+
+### 65.6 Implementasi di OmniByte
+
+**Status Saat Ini:**
+- OmniByte berjalan di **Android** (kernel Linux)
+- Android mendukung eBPF sejak Android 9 (Pie)
+- eBPF programs bisa di-load via `bpf()` syscall
+
+**Kelayakan Implementasi:**
+
+| Faktor | Status | Catatan |
+|--------|--------|---------|
+| **Android Support** | ⚠️ Limited | Android punya eBPF support tapi lebih restricted |
+| **Root Required** | ⚠️ Ya | eBPF membutuhkan root access |
+| **Kernel Version** | ⚠️ 4.14+ | Android kernel harus mendukung eBPF |
+| **Libbpf/bcc** | ⚠️ Porting | Perlu port libbpf ke Android NDK |
+
+**Rekomendasi Implementasi:**
+- **eBPF-based Tracer** — Trace program target menggunakan eBPF
+- **Syscall Monitor** — Monitor semua syscall dari target
+- **Network Sniffer** — Intercept traffic dari target app
+- **Integration dengan Dumper** — Gunakan eBPF untuk dynamic dumping
+
+---
+
+## 66. WebAssembly (Wasm)
+
+### 66.1 Apa itu WebAssembly?
+
+**WebAssembly (Wasm)** adalah format bytecode biner yang dirancang sebagai target kompilasi untuk bahasa tingkat tinggi (C, C++, Rust, Go). Wasm berjalan di **sandboxed virtual machine** dan aslinya dirancang untuk browser, tapi sekarang juga digunakan di luar browser (WASI).
+
+> **Analogi:** Wasm seperti "Java Virtual Machine tapi untuk semua bahasa" — kode dikompilasi ke bytecode portable yang bisa berjalan di platform manapun.
+
+### 66.2 Cara Kerja Wasm
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Wasm Pipeline                             │
+│                                                              │
+│  Source Code (C/C++/Rust/Go)                                │
+│       │                                                      │
+│       ▼                                                      │
+│  Compiler (clang, rustc, tinygo)                            │
+│       │                                                      │
+│       ▼                                                      │
+│  Wasm Binary (.wasm) ←── Format biner yang distandarisasi  │
+│       │                                                      │
+│       ├── Browser (Chrome, Firefox, Safari)                 │
+│       │       │                                              │
+│       │       ▼                                              │
+│       │   JavaScript Engine (V8, SpiderMonkey)              │
+│       │       │                                              │
+│       │       ▼                                              │
+│       │   Native Code (JIT compilation)                     │
+│       │                                                      │
+│       └── Standalone (Wasmtime, Wasmer, WasmEdge)          │
+│               │                                              │
+│               ▼                                              │
+│           Native Code (AOT atau JIT)                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 66.3 Format Wasm Binary
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Wasm Module Structure                      │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │                   Header                              │   │
+│  │  Magic: \0asm (0x00 0x61 0x73 0x6D)                │   │
+│  │  Version: 1 (0x01 0x00 0x00 0x00)                  │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │                Sections (Sequential)                  │   │
+│  │                                                      │   │
+│  │  1. Type Section      → Function signatures          │   │
+│  │  2. Import Section    → External functions            │   │
+│  │  3. Function Section  → Function type indices        │   │
+│  │  4. Table Section     → Indirect function table      │   │
+│  │  5. Memory Section    → Linear memory definition     │   │
+│  │  6. Global Section    → Global variables              │   │
+│  │  7. Export Section    → Functions/memory exported     │   │
+│  │  8. Start Section     → Init function                 │   │
+│  │  9. Element Section   → Table initialization          │   │
+│  │  10. Code Section     → Function bodies ←── Kode     │   │
+│  │  11. Data Section     → Memory initialization        │   │
+│  │  12. Custom Section   → Debug info, names            │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 66.4 Contoh Wasm Text Format (WAT)
+
+```wat
+;; Wasm Text Format (WAT) - Simple add function
+(module
+  ;; Function signature: (func $name (param $p1 type) (result type))
+  (func $add (param $a i32) (param $b i32) (result i32)
+    ;; Local variables
+    (local $temp i32)
+    
+    ;; Body
+    local.get $a       ;; Push $a ke stack
+    local.get $b       ;; Push $b ke stack
+    i32.add            ;; Pop 2, push hasil add
+  )
+  
+  ;; Export function agar bisa dipanggil dari luar
+  (export "add" (func $add))
+)
+```
+
+### 66.5 Instruksi Wasm
+
+| Kategori | Instruksi | Contoh |
+|----------|-----------|--------|
+| **Control** | `block`, `loop`, `if`, `br`, `return` | Flow control |
+| **Variable** | `local.get`, `local.set`, `global.get` | Akses variabel |
+| **Memory** | `i32.load`, `i32.store`, `memory.grow` | Akses linear memory |
+| **Numeric** | `i32.add`, `i32.mul`, `f64.div` | Operasi aritmatika |
+| **Reference** | `ref.null`, `ref.func`, `ref.is_null` | Reference types |
+
+### 66.6 WebAssembly untuk Reverse Engineering
+
+**Mengapa Wasm berguna untuk RE:**
+
+1. **Binary Analysis** — Analyze .wasm files dari web apps
+2. **Malware Analysis** — Wasm semakin banyak digunakan malware
+3. **Decompilation** — Decompile Wasm ke C/C++ (wasm2c, wasm-decompile)
+4. **Sandboxing** — Jalankan kode suspicious di sandbox aman
+5. **Format Portability** — Analisis kode cross-platform
+
+**Tools untuk RE Wasm:**
+
+| Tool | Fungsi |
+|------|--------|
+| **wabt** | WebAssembly Binary Toolkit (wasm2wat, wasm2c, wasm-objdump) |
+| **wasm-decompile** | Decompile Wasm ke C-like pseudocode |
+| **wasmedge** | Wasm runtime untuk analysis |
+| **binaryen** | Optimizer dan analysis tools |
+| **wasm3** | Wasm interpreter untuk debugging |
+
+### 66.7 Implementasi di OmniByte
+
+**Status Saat Ini:**
+- OmniByte mungkin perlu analyze APK/DEX yang mengandung Wasm
+- Beberapa Android apps menggunakan Wasm untuk compute-intensive tasks
+- Wasm bisa di-compile ke native code untuk performa
+
+**Kelayakan Implementasi:**
+
+| Faktor | Status | Catatan |
+|--------|--------|---------|
+| **Wasm Parser** | ✅ Possible | Parse .wasm files dari assets/dependencies |
+| **Wasm Decompiler** | ✅ Possible | Gunakan wabt library |
+| **Wasm VM** | ⚠️ Heavy | Full VM terlalu besar untuk mobile |
+| **Wasm → C Transpile** | ✅ Possible | wasm2c untuk analysis |
+
+**Rekomendasi Implementasi:**
+- **Wasm Parser Plugin** — Parse dan analyze .wasm files
+- **Wasm Decompiler** — Decompile ke C pseudocode
+- **Wasm Validator** — Validasi struktur .wasm
+- **Wasm to C Transpiler** — Transpile untuk analysis lebih lanjut
+
+---
+
+## 67. WebP (Image Format)
+
+### 67.1 Apa itu WebP?
+
+**WebP** adalah format gambar yang dikembangkan oleh Google, dirancang untuk memberikan kompresi yang lebih baik daripada JPEG dan PNG dengan kualitas yang setara. WebP mendukung lossy dan lossless compression, transparansi (alpha channel), dan animasi.
+
+> **Analogi:** WebP seperti "JPEG + PNG + GIF dalam satu format" — kompresi lebih baik, fitur lebih lengkap.
+
+### 67.2 Cara Kerja WebP
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    WebP Pipeline                             │
+│                                                              │
+│  Input Image (Raw Pixels)                                   │
+│       │                                                      │
+│       ▼                                                      │
+│  Color Space Conversion (RGB → YUV)                         │
+│       │                                                      │
+│       ▼                                                      │
+│  Block Partitioning (16x16 macroblocks)                     │
+│       │                                                      │
+│       ├── Lossy Path ──────────────────────────────────┐    │
+│       │   • Prediction (intra/inter)                   │    │
+│       │   • Transform (DCT)                            │    │
+│       │   • Quantization                               │    │
+│       │   • Entropy Coding (Boolean)                   │    │
+│       │                                                │    │
+│       └── Lossless Path ─────────────────────────────┐ │    │
+│           • Color Transform                          │ │    │
+│           • Green Subtraction                        │ │    │
+│           • Entropy Coding (Arithmetic)              │ │    │
+│                                                    │ │    │
+│       ┌────────────────────────────────────────────┘ │    │
+│       │                                              │    │
+│       ▼                                              ▼    │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │              WebP Container (RIFF)               │    │
+│  │                                                  │    │
+│  │  ┌────────────┐  ┌────────────┐  ┌──────────┐ │    │
+│  │  │   VP8      │  │   VP8L     │  │   VP8X   │ │    │
+│  │  │  (Lossy)   │  │ (Lossless) │  │ (Extended)│ │    │
+│  │  └────────────┘  └────────────┘  └──────────┘ │    │
+│  └──────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 67.3 Struktur WebP Container
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   WebP Container Structure                   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ RIFF Header                                          │   │
+│  │  • ChunkID: "RIFF"                                   │   │
+│  │  • File Size: uint32                                 │   │
+│  │  • Format: "WEBP"                                    │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ VP8 Chunk (Lossy)                                    │   │
+│  │  • ChunkID: "VP8 "                                   │   │
+│  │  • Frame header                                      │   │
+│  │  • Macroblock data                                   │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ VP8L Chunk (Lossless)                                │   │
+│  │  • ChunkID: "VP8L"                                   │   │
+│  │  • Transform data                                    │   │
+│  │  • Huffman + LZ77 coded data                         │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ VP8X Chunk (Extended)                                │   │
+│  │  • ChunkID: "VP8X"                                   │   │
+│  │  • Animation flag                                    │   │
+│  │  • Exif/XMP metadata                                │   │
+│  │  • ICC profile                                       │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 67.4 Perbandingan Format Gambar
+
+| Aspek | WebP | JPEG | PNG | AVIF |
+|-------|------|------|-----|------|
+| **Kompresi** | 25-34% lebih kecil dari JPEG | Baseline | Lossless | 50% lebih kecil dari JPEG |
+| **Quality** | Sangat baik | Baik | Sempurna (lossless) | Sangat baik |
+| **Transparansi** | Ya (alpha) | Tidak | Ya (alpha) | Ya (alpha) |
+| **Animasi** | Ya | Tidak | Ya (APNG) | Ya |
+| **Metadata** | EXIF, XMP, ICC | EXIF, XMP | Text chunks | EXIF, XMP, ICC |
+| **Browser Support** | Universal | Universal | Universal | Growing |
+| **Hardware Decode** | Limited | Wide | Wide | Limited |
+
+### 67.5 WebP untuk Reverse Engineering
+
+**Mengapa WebP relevan untuk RE:**
+
+1. **Asset Analysis** — Banyak Android apps menggunakan WebP untuk assets
+2. **Steganography** — WebP bisa menyembunyikan data (metadata, chunk tersembunyi)
+3. **Malware载体** — Malware bisa menyembunyikan payload di file gambar
+4. **Forensics** — Analisis metadata untuk investigating
+5. **Anti-Tampering** — Deteksi modifikasi pada gambar
+
+**Analisis WebP untuk RE:**
+
+```
+File Gambar (.webp)
+       │
+       ▼
+Parse RIFF Container
+       │
+       ├── Check VP8/VP8L/VP8X chunks
+       │
+       ├── Extract Metadata (EXIF, XMP, ICC)
+       │
+       ├── Check untuk data tersembunyi
+       │   • Extra chunks
+       │   • Padding bytes
+       │   • Metadata manipulation
+       │
+       └── Decode pixels (jika perlu)
+```
+
+### 67.6 Implementasi di OmniByte
+
+**Status Saat Ini:**
+- Android native support WebP ( BitmapFactory )
+- OmniByte bisa menganalisis gambar dari APK assets
+- WebP parsing untuk forensics dan steganography analysis
+
+**Kelayakan Implementasi:**
+
+| Faktor | Status | Catatan |
+|--------|--------|---------|
+| **WebP Parser** | ✅ Possible | Parse RIFF container, extract chunks |
+| **Metadata Extractor** | ✅ Possible | EXIF, XMP, ICC profile extraction |
+| **Steganography Detection** | ✅ Possible | Check untuk hidden data |
+| **WebP Decoder** | ⚠️ Heavy | Full decoder terlalu besar, gunakan Android API |
+
+**Rekomendasi Implementasi:**
+- **WebP Parser Plugin** — Parse RIFF container, list chunks
+- **Metadata Extractor** — Extract EXIF, XMP, ICC dari WebP
+- **Steganography Detector** — Deteksi data tersembunyi di gambar
+- **Image Forensics** — Analisis integrity gambar
+
+---
+
 **Dokumen ini merupakan bagian dari proyek Pengembangan OmniByte dan disusun sebagai referensi teknis untuk tim pengembang.**
 
 **Terakhir diperbarui:** 2026-09-12
-**Revisi:** 4.5
+**Revisi:** 4.6
