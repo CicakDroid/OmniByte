@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="../assets/icon.svg" width="128" alt="OmniByte Icon"/>
+  <img src="assets/icon.svg" width="128" alt="OmniByte Icon"/>
 </p>
 
 <h1 align="center">OmniByte</h1>
@@ -23,7 +23,7 @@
 
 OmniByte 是一个基于 **Kotlin + C++ Native** 构建的 Android 逆向工程工具包，支持多架构（**ARMv7** & **ARMv8a**）和多版本 Android（**6.0 到最新版本**）。
 
-该工具包专为静态和动态分析、反编译、二进制编辑、函数 Hooking、内存编辑以及网络数据包监控和编辑而设计 — 全部集成在一个统一平台中。
+该工具包专为静态和动态分析、反编译、二进制编辑、函数 Hooking、内存编辑以及网络监控、捕获与编辑而设计 — 全部集成在一个统一平台中。
 
 ## 主要功能
 
@@ -36,8 +36,7 @@ OmniByte 是一个基于 **Kotlin + C++ Native** 构建的 Android 逆向工程�
 | 📦 **Binary Dumper** | 手动或在 Live PID 期间自动转储二进制结构 |
 | 🪝 **Hooking** | 使用 4 种不同技术 Hook 原生函数和 ART 方法 |
 | 🧠 **内存编辑器** | 读写活动进程内存 |
-| 🌐 **网络数据包监控器** | 实时监控网络流量 |
-| 📝 **网络数据包编辑器** | 实时拦截和编辑网络数据包 |
+| 🌐 **网络监控、捕获与编辑** | 实时监控、捕获和编辑网络数据包 |
 
 ## 平台支持
 

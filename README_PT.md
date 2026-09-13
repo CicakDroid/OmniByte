@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="../assets/icon.svg" width="128" alt="OmniByte Icon"/>
+  <img src="assets/icon.svg" width="128" alt="OmniByte Icon"/>
 </p>
 
 <h1 align="center">OmniByte</h1>
 
 <p align="center">
   <strong>Toolkit de Engenharia Reversa Android</strong><br/>
-  Descompilador &bull; Editor &bull; Dumper &bull; Hooking &bull; Editor de Memória &bull; Monitor de Rede
+  Descompilador &bull; Editor &bull; Dumper &bull; Hooking &bull; Editor de Memória &bull; Monitoramento de Rede
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@
 
 OmniByte é um toolkit de engenharia reversa Android construído com **Kotlin + C++ Nativo**, suportando multi-arquitetura (**ARMv7** & **ARMv8a**) e multi-versão Android (**6.0 até a versão mais recente**).
 
-O toolkit é projetado para análise estática e dinâmica, descompilação, edição de binários, hooking de funções, edição de memória e monitoramento e edição de pacotes de rede — tudo em uma única plataforma integrada.
+O toolkit é projetado para análise estática e dinâmica, descompilação, edição de binários, hooking de funções, edição de memória e monitoramento, captura e edição de rede — tudo em uma única plataforma integrada.
 
 ## Principais Funcionalidades
 
@@ -36,8 +36,7 @@ O toolkit é projetado para análise estática e dinâmica, descompilação, edi
 | 📦 **Binary Dumper** | Despejar estrutura de binários manualmente ou automaticamente durante Live PID |
 | 🪝 **Hooking** | Hook de funções nativas e métodos ART com 4 técnicas diferentes |
 | 🧠 **Editor de Memória** | Ler e escrever na memória de processos ativos |
-| 🌐 **Monitor de Pacotes de Rede** | Monitoramento de tráfego de rede em tempo real |
-| 📝 **Editor de Pacotes de Rede** | Interceptar e editar pacotes de rede em tempo real |
+| 🌐 **Monitoramento, Captura & Edição de Rede** | Monitore, capture e edite pacotes de rede em tempo real |
 
 ## Suporte à Plataforma
 

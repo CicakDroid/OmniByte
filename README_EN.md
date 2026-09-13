@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="../assets/icon.svg" width="128" alt="OmniByte Icon"/>
+  <img src="assets/icon.svg" width="128" alt="OmniByte Icon"/>
 </p>
 
 <h1 align="center">OmniByte</h1>
 
 <p align="center">
   <strong>Android Reverse Engineering Toolkit</strong><br/>
-  Decompiler &bull; Editor &bull; Dumper &bull; Hooking &bull; Memory Editor &bull; Network Monitor
+  Decompiler &bull; Editor &bull; Dumper &bull; Hooking &bull; Memory Editor &bull; Network Monitoring
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@
 
 OmniByte is an Android reverse engineering toolkit built on **Kotlin + C++ Native**, supporting multi-architecture (**ARMv7** & **ARMv8a**) and multi-version Android (**6.0 to the latest release**).
 
-The toolkit is designed for static & dynamic analysis, decompilation, binary editing, function hooking, memory editing, and network packet monitoring & editing — all in a single integrated platform.
+The toolkit is designed for static & dynamic analysis, decompilation, binary editing, function hooking, memory editing, and network monitoring, capture & editing — all in a single integrated platform.
 
 ## Key Features
 
@@ -36,8 +36,7 @@ The toolkit is designed for static & dynamic analysis, decompilation, binary edi
 | 📦 **Binary Dumper** | Dump binary structure manually or automatically during Live PID |
 | 🪝 **Hooking** | Hook native functions & ART methods with 4 different techniques |
 | 🧠 **Memory Editor** | Read & write live process memory |
-| 🌐 **Network Packet Monitor** | Real-time network traffic monitoring |
-| 📝 **Network Packet Editor** | Intercept & edit network packets in real-time |
+| 🌐 **Network Monitoring, Capture & Editing** | Monitor, capture, and edit network packets in real-time |
 
 ## Platform Support
 

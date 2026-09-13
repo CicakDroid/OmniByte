@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="../assets/icon.svg" width="128" alt="OmniByte Icon"/>
+  <img src="assets/icon.svg" width="128" alt="OmniByte Icon"/>
 </p>
 
 <h1 align="center">OmniByte</h1>
 
 <p align="center">
   <strong>Toolkit Reverse Engineering Android</strong><br/>
-  Dekompilator &bull; Editor &bull; Dumper &bull; Hooking &bull; Editor Memori &bull; Monitor Jaringan
+  Dekompilator &bull; Editor &bull; Dumper &bull; Hooking &bull; Editor Memori &bull; Monitoring Jaringan
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@
 
 OmniByte adalah toolkit reverse engineering Android berbasis **Kotlin + C++ Native** yang mendukung multi-arsitektur (**ARMv7** & **ARMv8a**) dan multi-versi Android (**6.0 hingga versi terakhir**).
 
-Toolkit ini dirancang untuk analisis statis & dinamis, dekompilasi, editasi biner, hooking fungsi, editasi memori, serta pemantauan, perekaman, & manipulasi paket jaringan — semua dalam satu platform terpadu.
+Toolkit ini dirancang untuk analisis statis & dinamis, dekompilasi, editasi biner, hooking fungsi, editasi memori, serta monitoring, penangkapan & editasi jaringan — semua dalam satu platform terpadu.
 
 ## Fitur Utama
 
@@ -36,8 +36,7 @@ Toolkit ini dirancang untuk analisis statis & dinamis, dekompilasi, editasi bine
 | 📦 **Binary Dumper** | Dump struktur biner secara manual atau otomatis saat Live PID |
 | 🪝 **Hooking** | Hook fungsi native & ART method dengan 4 teknik berbeda |
 | 🧠 **Editor Memori** | Baca & tulis memori proses live |
-| 🌐 **Monitor Paket Jaringan** | Pemantauan & perekaman traffic jaringan real-time |
-| 📝 **Editor Paket Jaringan** | Analisis & manipulasi paket jaringan secara langsung |
+| 🌐 **Monitoring, Penangkapan & Editasi Jaringan** | Monitor, tangkap, dan edit paket jaringan secara real-time |
 
 ## Dukungan Platform
 
