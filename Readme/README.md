@@ -23,21 +23,21 @@
 
 OmniByte adalah toolkit reverse engineering Android berbasis **Kotlin + C++ Native** yang mendukung multi-arsitektur (**ARMv7** & **ARMv8a**) dan multi-versi Android (**6.0 hingga versi terakhir**).
 
-Toolkit ini dirancang untuk analisis statis & dinamis, dekompilasi, editasi biner, hooking fungsi, editasi memori, serta monitor & manipulasi paket jaringan — semua dalam satu platform terpadu.
+Toolkit ini dirancang untuk analisis statis & dinamis, dekompilasi, editasi biner, hooking fungsi, editasi memori, serta pemantauan, perekaman, & manipulasi paket jaringan — semua dalam satu platform terpadu.
 
 ## Fitur Utama
 
 | Fitur | Deskripsi |
 |-------|-----------|
 | 🔍 **APK Decompiler** | Dekompilasi APK ke source code (Java/Smali/DEX) dengan dukungan multi-engine |
-| ✏️ **APK Editor** | Manipulasi manifest, resource, smali, dan rebuild APK |
+| ✏️ **APK Editor** | Penampil & manipulasi manifest, resource, smali, dan rebuild APK |
 | 📊 **Analisis Biner** | Analisis statis & dinamis biner (ELF/PE) dengan disassembler & decompiler |
-| 🔧 **Editor Biner** | Ekplorasi & manipulasi biner langsung dengan hex editor & patching |
+| 🔧 **Editor Biner** | Penampil, ekplorasi & manipulasi biner langsung dengan hex editor & patching |
 | 📦 **Binary Dumper** | Dump struktur biner secara manual atau otomatis saat Live PID |
 | 🪝 **Hooking** | Hook fungsi native & ART method dengan 4 teknik berbeda |
 | 🧠 **Editor Memori** | Baca & tulis memori proses live |
-| 🌐 **Monitor Paket Jaringan** | Monitor traffic jaringan real-time |
-| 📝 **Editor Paket Jaringan** | Analisis & Manipulasi paket jaringan secara langsung |
+| 🌐 **Monitor Paket Jaringan** | Pemantauan & perekaman traffic jaringan real-time |
+| 📝 **Editor Paket Jaringan** | Analisis & manipulasi paket jaringan secara langsung |
 
 ## Dukungan Platform
 
@@ -53,50 +53,50 @@ Toolkit ini dirancang untuk analisis statis & dinamis, dekompilasi, editasi bine
 
 ```
 OmniByte/
-├── app/                          # Aplikasi Android (Kotlin)
+├── app/                                 # Aplikasi Android (Kotlin)
 │   └── src/main/
-│       ├── java/com/omnibyte/    # Source Kotlin
-│       ├── cpp/                  # Native aggregator (CMake)
-│       └── res/                  # Resource Android
-├── Hydra/                        # Mesin Analisis Statis
-│   ├── Hydra2D/                  # Mesin analisis inti
-│   │   ├── Disassembler/         # Disassembly biner
-│   │   ├── Decompiler/           # Dekompilasi kode
-│   │   ├── Parser/               # Parsing format biner
-│   │   ├── Orchestrator/         # Orkestrasi analisis
-│   │   ├── Factory/              # Faktor komponen
-│   │   ├── Plugin/               # Plugin analisis
-│   │   │   ├── Enhanced/         # Plugin lanjutan
-│   │   │   │   ├── AST/          # Abstract Syntax Tree
-│   │   │   │   ├── CFG/          # Control Flow Graph
-│   │   │   │   ├── Crypt/        # Deteksi kriptografi
-│   │   │   │   ├── Deobfuscate/  # Deobfuskasi
-│   │   │   │   ├── Emulation/    # Emulasi biner
-│   │   │   │   ├── FunctionResolver/
-│   │   │   │   ├── RTTI/         # Runtime Type Info
-│   │   │   │   ├── Signatures/   # Pola tanda tangan
+│       ├── java/com/omnibyte/           # Source Kotlin
+│       ├── cpp/                         # Native aggregator (CMake)
+│       └── res/                         # Resource Android
+├── Hydra/                               # Mesin Analisis Statis & Dinamis
+│   ├── Hydra2D/                         # Mesin analisis inti
+│   │   ├── Disassembler/                # Disassembly biner
+│   │   ├── Decompiler/                  # Dekompilasi kode
+│   │   ├── Parser/                      # Parsing format biner
+│   │   ├── Orchestrator/                # Orkestrasi analisis
+│   │   ├── Factory/                     # Faktor komponen
+│   │   ├── Plugin/                      # Plugin analisis
+│   │   │   ├── Enhanced/                # Plugin lanjutan
+│   │   │   │   ├── AST/                 # Abstract Syntax Tree
+│   │   │   │   ├── CFG/                 # Control Flow Graph
+│   │   │   │   ├── Crypt/               # Deteksi kriptografi
+│   │   │   │   ├── Deobfuscate/         # Deteksi & penghilang obfuskasi
+│   │   │   │   ├── Emulation/           # Emulasi biner
+│   │   │   │   ├── FunctionResolver/.   #
+│   │   │   │   ├── RTTI/                # Runtime Type Info
+│   │   │   │   ├── Signatures/          # Pola tanda tangan
 │   │   │   │   └── SymbolicExecution/
-│   │   │   └── ScriptHooks/      # Hook berbasis skrip
+│   │   │   └── ScriptHooks/             # Hook berbasis skrip
 │   │   └── docs/
-│   └── Shared/                   # Metadata bersama
+│   └── Shared/                           # Metadata bersama
 ├── modules/
-│   ├── Dumper/                   # Modul Binary Dumper
-│   │   ├── DumperCore/           # Logika inti dumper
-│   │   │   ├── Detector/         # Deteksi engine
-│   │   │   ├── EngineRegistry/   # Registrasi engine
-│   │   │   ├── ResultNormalizer/ # Normalisasi output
-│   │   │   ├── SignatureBypass/  # Bypass tanda tangan APK
-│   │   │   ├── SharedUtils/      # Utilitas
-│   │   │   └── WorkingModes/     # Mode Manual & Live
-│   │   ├── Engines/              # 7 Engine Dumper
-│   │   │   ├── UnityIL2CPP/      # Unity IL2CPP
-│   │   │   ├── UnityMono/        # Unity Mono
-│   │   │   ├── UnrealEngine/     # Unreal Engine
-│   │   │   ├── Godot/            # Godot Engine
+│   ├── Dumper/                           # Modul Binary Dumper
+│   │   ├── DumperCore/                   # Logika inti dumper
+│   │   │   ├── Detector/                 # Deteksi engine
+│   │   │   ├── EngineRegistry/           # Registrasi engine
+│   │   │   ├── ResultNormalizer/         # Normalisasi output
+│   │   │   ├── SignatureBypass/          # Bypass tanda tangan APK
+│   │   │   ├── SharedUtils/              # Utilitas
+│   │   │   └── WorkingModes/             # Mode Manual & Live
+│   │   ├── Engines/                      # 7 Engine Dumper
+│   │   │   ├── UnityIL2CPP/              # Unity IL2CPP
+│   │   │   ├── UnityMono/                # Unity Mono
+│   │   │   ├── UnrealEngine/             # Unreal Engine
+│   │   │   ├── Godot/                    # Godot Engine
 │   │   │   ├── Cocos2d/          # Cocos2d
 │   │   │   ├── GameMaker/        # GameMaker
 │   │   │   └── Source2/          # Source 2
-│   │   └── Export/               # Penulis output
+│   │   └── Export/               # Penulis hasil
 │   ├── Hooker/                   # Modul Hooking
 │   │   ├── HookEngine/           # Teknik hook
 │   │   │   ├── ARTHook/          # Hook metode ART
@@ -107,8 +107,8 @@ OmniByte/
 │   │       ├── Albatross/        # Backend ART hook
 │   │       ├── Bhook/            # Backend PLT/GOT
 │   │       ├── Inlinehook/       # Backend inline hook
-│   │       ├── KittyMemory/      # Patching memori
-│   │       ├── KittyMemoryEx/    # Memori terpanjang
+│   │       ├── KittyMemory/      # Manipulasi memori
+│   │       ├── KittyMemoryEx/    # Ekstensi manipulasi memori
 │   │       └── Vector/           # Backend traceless
 │   └── HPT/                      # Modul HPT
 │       ├── Hooker/               # Wrapper hook
@@ -129,13 +129,13 @@ OmniByte/
 │       └── RootThread/           # Manajemen thread root
 ├── common/                       # Utilitas bersama
 │   ├── Math/                     # Utilitas matematika
-│   └── Serialization/            # Serialisasi
+│   └── Json/                     # Serialisasi
 ├── toolchain/                    # Toolchain build
 │   ├── rizin-android/            # Disassembler Rizin
 │   └── stub-headers/             # Header stub
 ├── scripts/                      # Skrip build
 ├── docs/                         # Dokumentasi
-└── test/                         # Fixture test
+└── test/                         # Bahan untuk test
 ```
 
 ## Pipeline Kerja
