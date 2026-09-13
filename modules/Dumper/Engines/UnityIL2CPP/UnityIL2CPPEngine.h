@@ -1,5 +1,8 @@
 #pragma once
-// ── UnityIL2CPPEngine.h (menyatukan Analyzer + Resolver + Registry glue) ──
+// ── UnityIL2CPPEngine.h — IL2CPP dumper engine (merged from Dumper1 + UnityIL2CPP) ──
+// Implements IDumperEngine. Orchestrates Analyzer + Resolver + Profiles.
+// Detects binary format, parses metadata with XOR decryption, finds
+// CodeRegistration/MetadataRegistration, generates dump output.
 #include "../../DumperCore/IDumperEngine.h"
 #include "../../DumperCore/IEngineProfile.h"
 #include "Analyzer/UnityIL2CPPAnalyzer.h"
@@ -13,6 +16,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <fstream>
 
 namespace omnibyte::dumper::unityil2cpp {
 
@@ -22,12 +26,56 @@ public:
     std::string name() const override { return "Unity IL2CPP"; }
 
     DetectionResult detect(const AnalysisTarget& target) const override {
-        // 1. cari libil2cpp.so di target (APK lib/ atau live process maps)
-        // 2. cari global-metadata.dat, cek magic 0xAF1BB1FA
-        // 3. kalau match, baca version field mentah dari header
         DetectionResult r;
-        (void)target;
-        // r.matched = ...; r.confidence = ...; r.detectedVersion = "27";
+
+        if (!target.isFile()) return r;
+
+        auto data = utils::readFileBytes(target.filePath);
+        if (data.empty()) return r;
+
+        // Check for IL2CPP metadata magic (0xFAB11BAF) or encrypted variant
+        if (data.size() >= 8) {
+            uint32_t magic;
+            std::memcpy(&magic, data.data(), 4);
+
+            // Direct magic match
+            if (magic == 0xFAB11BAF) {
+                uint32_t ver;
+                std::memcpy(&ver, data.data() + 4, 4);
+                r.matched = true;
+                r.confidence = 1.0f;
+                r.detectedVersion = std::to_string(ver);
+                return r;
+            }
+
+            // Check for encrypted metadata (single-byte XOR)
+            for (uint16_t k = 1; k < 256; ++k) {
+                uint8_t test[4];
+                for (int i = 0; i < 4; ++i) test[i] = data[i] ^ static_cast<uint8_t>(k);
+                uint32_t testMagic;
+                std::memcpy(&testMagic, test, 4);
+                if (testMagic == 0xFAB11BAF) {
+                    r.matched = true;
+                    r.confidence = 0.8f;
+                    r.detectedVersion = "encrypted";
+                    return r;
+                }
+            }
+
+            // Check for ELF binary containing IL2CPP
+            if (magic == 0x464C457F) { // ELF magic
+                const std::string metaName = "global-metadata.dat";
+                for (size_t i = 0; i + metaName.size() <= data.size(); ++i) {
+                    if (std::memcmp(data.data() + i, metaName.data(), metaName.size()) == 0) {
+                        r.matched = true;
+                        r.confidence = 0.7f;
+                        r.detectedVersion = "elf_with_metadata";
+                        return r;
+                    }
+                }
+            }
+        }
+
         return r;
     }
 
@@ -39,25 +87,126 @@ public:
         if (detectedVersion == "27") return std::make_shared<V27Profile>();
         if (detectedVersion == "29") return std::make_shared<V29Profile>();
         if (detectedVersion == "31") return std::make_shared<V31Profile>();
-        return nullptr; // -> caller fallback ke generic profile / minta pilih manual
+        if (detectedVersion == "encrypted") return std::make_shared<V27Profile>();
+        if (detectedVersion == "elf_with_metadata") return std::make_shared<V27Profile>();
+        return nullptr;
     }
 
-    // Analyzer: baca global-metadata.dat pakai profile->offsetOf(...)
     DumpData analyze(const AnalysisTarget& target,
                         const std::shared_ptr<IEngineProfile>& profile) override {
-        return UnityIL2CPPAnalyzer::analyze(target, profile);
+        DumpData result = UnityIL2CPPAnalyzer::analyze(target, profile);
+
+        if (result.success && !target.filePath.empty()) {
+            generateOutput(result, target.filePath);
+        }
+
+        return result;
     }
 
-    // Resolver: butuh live process -- pakai runtime/SymbolResolver (xDL)
-    // untuk resolve alamat libil2cpp.so yang sudah di-load, lalu cross-reference
-    // dengan hasil analyze() di atas untuk dapat alamat konkret tiap method.
     DumpData resolveSymbols(const AnalysisTarget& target,
                                const std::shared_ptr<IEngineProfile>& profile) override {
-        return UnityIL2CPPResolver::resolveSymbols(target, profile);
+        DumpData result;
+        result.engineName = "Unity IL2CPP";
+        result.detectedVersion = profile ? profile->version() : "unknown";
+
+        if (!profile) {
+            result.errorMessage = "No profile provided";
+            return result;
+        }
+
+        // Static binary analysis: find CodeRegistration/MetadataRegistration
+        auto typeDefCount = static_cast<uint32_t>(profile->offsetOf("typeDefinitionCount"));
+        auto methodDefCount = static_cast<uint32_t>(profile->offsetOf("methodDefinitionCount"));
+        auto imageDefCount = static_cast<uint32_t>(profile->offsetOf("imageDefinitionCount"));
+
+        auto regPair = UnityIL2CPPResolver::resolve(target, profile,
+                                                     typeDefCount, methodDefCount, imageDefCount);
+
+        if (regPair.found()) {
+            result.setMeta("codeRegistration", toHex(regPair.codeRegistration));
+            result.setMeta("metadataRegistration", toHex(regPair.metadataRegistration));
+        }
+
+        // Runtime symbol resolution (via xdl)
+        auto runtimeResult = UnityIL2CPPResolver::resolveSymbols(target, profile);
+        if (runtimeResult.success) {
+            result.success = true;
+        } else if (!regPair.found()) {
+            result.errorMessage = "CodeRegistration/MetadataRegistration not found";
+        } else {
+            result.success = true;
+        }
+
+        return result;
     }
 
     std::vector<std::string> supportedVersions() const override {
-        return {"24", "24.1", "24.2", "27", "29", "31"}; // v31 = versi metadata terbaru saat ini (Unity 6000.x & 2022.3 LTS masih pakai v31)
+        return {"24", "24.1", "24.2", "27", "29", "31"};
+    }
+
+private:
+    static void generateOutput(const DumpData& data, const std::string& inputPath) {
+        std::string basePath = inputPath;
+        auto lastSlash = basePath.find_last_of("/\\");
+        if (lastSlash != std::string::npos) {
+            basePath = basePath.substr(0, lastSlash + 1);
+        } else {
+            basePath = "";
+        }
+
+        // CSharpWriter (existing)
+        {
+            std::ofstream ofs(basePath + "dump.cs");
+            if (ofs.is_open()) {
+                // Write type definitions
+                for (const auto& t : data.typeTable) {
+                    ofs << "public class " << t.name << " {" << std::endl;
+                    for (const auto& m : data.methodTable) {
+                        if (m.declaringTypeIndex == t.index) {
+                            ofs << "    public void " << m.name << "() {}" << std::endl;
+                        }
+                    }
+                    ofs << "}" << std::endl;
+                }
+            }
+        }
+
+        // StructGenerator
+        {
+            std::ofstream ofs(basePath + "struct_dump.cs");
+            if (ofs.is_open()) {
+                for (const auto& t : data.typeTable) {
+                    ofs << "public struct " << t.name << " {" << std::endl;
+                    for (const auto& f : data.fieldTable) {
+                        if (f.declaringTypeIndex == t.index) {
+                            ofs << "    public " << f.typeName << " " << f.name << ";" << std::endl;
+                        }
+                    }
+                    ofs << "}" << std::endl;
+                }
+            }
+        }
+
+        // StaticFieldExporter
+        {
+            std::ofstream ofs(basePath + "static_fields.txt");
+            if (ofs.is_open()) {
+                ofs << "Static Field Offsets" << std::endl;
+                ofs << "===================" << std::endl;
+                for (const auto& f : data.fieldTable) {
+                    if (f.isStatic) {
+                        ofs << f.typeName << "::" << f.name << " @ 0x" << std::hex << f.offset << std::endl;
+                    }
+                }
+            }
+        }
+    }
+
+    static std::string toHex(uint64_t val) {
+        if (val == 0) return "0x0";
+        char buf[32];
+        snprintf(buf, sizeof(buf), "0x%llx", (unsigned long long)val);
+        return std::string(buf);
     }
 };
 

@@ -15,8 +15,11 @@ namespace omnibyte::dumper::unityil2cpp {
 
 class UnityIL2CPPAnalyzer {
 public:
+    using ProgressCallback = std::function<void(const std::string&)>;
+
     static DumpData analyze(const AnalysisTarget& target,
-                              const std::shared_ptr<IEngineProfile>& profile) {
+                              const std::shared_ptr<IEngineProfile>& profile,
+                              ProgressCallback progress = nullptr) {
         DumpData result;
         result.engineName = "Unity IL2CPP";
         result.detectedVersion = profile ? profile->version() : "unknown";
@@ -31,6 +34,7 @@ public:
             return result;
         }
 
+        if (progress) progress("Reading metadata file...");
         auto fileData = utils::readFileBytes(target.filePath);
         if (fileData.empty()) {
             result.errorMessage = "Failed to read file: " + target.filePath;
@@ -43,21 +47,39 @@ public:
             return result;
         }
 
+        // Try XOR decryption if metadata is encrypted
+        if (progress) progress("Checking metadata encryption...");
+        if (!isValidMetadataVersion(fileData)) {
+            if (progress) progress("Metadata appears encrypted, attempting XOR decryption...");
+            if (!tryDecryptMetadata(fileData)) {
+                result.errorMessage = "Failed to decrypt metadata";
+                return result;
+            }
+            if (progress) progress("Metadata decrypted successfully");
+        }
+
         uint32_t magic = readU32(fileData, 0);
         if (magic != kIl2CppMagic) {
-            result.errorMessage = "Invalid IL2CPP metadata magic (expected 0xAF1BB1FA)";
+            result.errorMessage = "Invalid IL2CPP metadata magic (expected 0x" + std::string(kIl2CppMagic == 0xFAB11BAF ? "FAB11BAF" : "AF1BB1FA") + ")";
             return result;
         }
 
         uint32_t version = readU32(fileData, 4);
         result.setMeta("metadataVersion", std::to_string(version));
 
-        // Use profile offsets to locate metadata sections
-        return parseMetadata(fileData, profile, result);
+        if (progress) progress("Parsing metadata...");
+        parseMetadata(fileData, profile, result, progress);
+
+        result.setMeta("typeCount", std::to_string(result.typeTable.size()));
+        result.setMeta("methodCount", std::to_string(result.methodTable.size()));
+        result.setMeta("fieldCount", std::to_string(result.fieldTable.size()));
+        result.setMeta("stringCount", std::to_string(result.stringTable.size()));
+        result.success = true;
+        return result;
     }
 
 private:
-    static const uint32_t kIl2CppMagic = 0xAF1BB1FA;
+    static const uint32_t kIl2CppMagic = 0xFAB11BAF;
 
     // Helper read functions
     static uint32_t readU32(const std::vector<uint8_t>& buf, size_t off) {
@@ -74,9 +96,8 @@ private:
         return v;
     }
 
-    // Read string from string heap (IL2CPP string literals are stored as
-    // offset into a data section)
-    static std::string readStringFromHeap(const std::vector<uint8_t>& data,
+    // Read a null-terminated string from the data blob (runtime heap reading)
+static std::string readStringFromHeap(const std::vector<uint8_t>& data,
                                            size_t heapOffset, uint32_t strOffset) {
         size_t absOffset = heapOffset + strOffset;
         if (absOffset >= data.size()) return "";
@@ -87,127 +108,252 @@ private:
         return std::string(reinterpret_cast<const char*>(data.data() + absOffset), len);
     }
 
-    // Parse the full IL2CPP metadata
-    static DumpData parseMetadata(const std::vector<uint8_t>& data,
-                                     const std::shared_ptr<IEngineProfile>& profile,
-                                     DumpData& result) {
-        // IL2CPP metadata layout (version-dependent, offsets from profile):
-        //   stringLiteralOffset, stringLiteralDataOffset
-        //   typeDefinitionsOffset, typeDefinitionCount
-        //   methodDefinitionOffset, methodDefinitionCount
-        //   fieldDefinitionOffset, fieldDefinitionCount
-        //   imageDefinitionOffset, imageDefinitionCount
+    // Read a length-prefixed UTF-8 string from the string data blob
+    // IL2CPP string data format: 4-byte LE length, then that many bytes.
+    // nameIndex is a byte offset into the string data region.
+static std::string readNameFromData(const std::vector<uint8_t>& data,
+                                         size_t dataRegionStart, uint32_t nameIndex) {
+        size_t pos = dataRegionStart + static_cast<size_t>(nameIndex);
+        if (pos + 4 > data.size()) return "";
+        uint32_t len = readU32(data, pos);
+        pos += 4;
+        if (pos + len > data.size() || len > 1024 * 1024) return ""; // sanity check: 1MB max
+        return std::string(reinterpret_cast<const char*>(data.data() + pos), len);
+    }
 
-        size_t typeDefOffset = static_cast<size_t>(
-            profile->offsetOf("typeDefinitionsOffset"));
-        uint32_t typeDefCount = static_cast<uint32_t>(
-            profile->offsetOf("typeDefinitionCount"));
-        size_t methodDefOffset = static_cast<size_t>(
-            profile->offsetOf("methodDefinitionOffset"));
-        uint32_t methodDefCount = static_cast<uint32_t>(
-            profile->offsetOf("methodDefinitionCount"));
-        size_t fieldDefOffset = static_cast<size_t>(
-            profile->offsetOf("fieldDefinitionOffset"));
-        uint32_t fieldDefCount = static_cast<uint32_t>(
-            profile->offsetOf("fieldDefinitionCount"));
-        size_t imageDefOffset = static_cast<size_t>(
-            profile->offsetOf("imageDefinitionOffset"));
-        uint32_t imageDefCount = static_cast<uint32_t>(
-            profile->offsetOf("imageDefinitionCount"));
-        size_t stringLiteralOffset = static_cast<size_t>(
-            profile->offsetOf("stringLiteralOffset"));
-        size_t stringLiteralDataOffset = static_cast<size_t>(
-            profile->offsetOf("stringLiteralDataOffset"));
+    // ── XOR Metadata Decryption ──
+    // Attempts multiple XOR decryption strategies on encrypted metadata.
+static bool isValidMetadataVersion(const std::vector<uint8_t>& data) {
+        if (data.size() < 8) return false;
+        int32_t ver;
+        std::memcpy(&ver, data.data() + 4, 4);
+        return ver > 0 && ver < 200;
+    }
 
-        // Get struct sizes from profile
+static bool tryDecryptMetadata(std::vector<uint8_t>& data) {
+        if (data.size() < 16) return false;
+
+        const uint8_t target[] = { 0xAF, 0x1B, 0xB1, 0xFA };
+
+        // Single-byte XOR
+        {
+            uint8_t k1 = target[0] ^ data[0];
+            if (k1 != 0) {
+                std::vector<uint8_t> test(data.begin(), data.end());
+                for (auto& b : test) b ^= k1;
+                if (isValidMetadataVersion(test)) {
+                    for (auto& b : data) b ^= k1;
+                    return true;
+                }
+            }
+        }
+
+        // 4-byte XOR
+        {
+            uint8_t key4[4];
+            bool allZero = true;
+            for (int i = 0; i < 4; ++i) {
+                key4[i] = target[i] ^ data[i];
+                if (key4[i] != 0) allZero = false;
+            }
+            if (!allZero) {
+                std::vector<uint8_t> test(data.begin(), data.end());
+                for (size_t i = 0; i < test.size(); ++i) test[i] ^= key4[i % 4];
+                if (isValidMetadataVersion(test)) {
+                    for (size_t i = 0; i < data.size(); ++i) data[i] ^= key4[i % 4];
+                    return true;
+                }
+            }
+        }
+
+        // 8-byte XOR
+        {
+            uint8_t key8[8];
+            for (int i = 0; i < 4; ++i) key8[i] = target[i] ^ data[i];
+            for (int i = 4; i < 8; ++i) key8[i] = data[i];
+            if (key8[0] != 0 || key8[1] != 0 || key8[2] != 0 || key8[3] != 0) {
+                std::vector<uint8_t> test(data.begin(), data.end());
+                for (size_t i = 0; i < test.size(); ++i) test[i] ^= key8[i % 8];
+                if (isValidMetadataVersion(test)) {
+                    for (size_t i = 0; i < data.size(); ++i) data[i] ^= key8[i % 8];
+                    return true;
+                }
+            }
+        }
+
+        // Rolling XOR (key lengths: 16, 32, 64, 128, 256)
+        for (size_t keyLen : {16u, 32u, 64u, 128u, 256u}) {
+            if (data.size() < keyLen * 2) continue;
+            std::vector<uint8_t> key(keyLen);
+            for (size_t i = 0; i < keyLen; ++i) {
+                key[i] = (i < 4) ? (target[i] ^ data[i]) : data[i];
+            }
+            if (key[0] == 0 && key[1] == 0 && key[2] == 0 && key[3] == 0) continue;
+            std::vector<uint8_t> test(data.begin(), data.begin() + 8);
+            for (size_t i = 0; i < test.size(); ++i) test[i] ^= key[i % keyLen];
+            if (test[0] == target[0] && test[1] == target[1] &&
+                test[2] == target[2] && test[3] == target[3] &&
+                isValidMetadataVersion(test)) {
+                for (size_t i = 0; i < data.size(); ++i) data[i] ^= key[i % keyLen];
+                return true;
+            }
+        }
+
+        // Position-dependent XOR
+        {
+            uint8_t key4[4];
+            for (int i = 0; i < 4; ++i) key4[i] = target[i] ^ data[i];
+            std::vector<uint8_t> test(data.begin(), data.end());
+            for (size_t i = 0; i < test.size(); ++i) test[i] ^= key4[i % 4] ^ static_cast<uint8_t>(i);
+            if (test[0] == target[0] && test[1] == target[1] &&
+                test[2] == target[2] && test[3] == target[3] &&
+                isValidMetadataVersion(test)) {
+                for (size_t i = 0; i < data.size(); ++i) data[i] ^= key4[i % 4] ^ static_cast<uint8_t>(i);
+                return true;
+            }
+        }
+
+        // Masked position XOR
+        {
+            uint8_t key4[4];
+            for (int i = 0; i < 4; ++i) key4[i] = target[i] ^ data[i];
+            std::vector<uint8_t> test(data.begin(), data.end());
+            for (size_t i = 0; i < test.size(); ++i) test[i] ^= key4[i % 4] ^ static_cast<uint8_t>(i & 0xFF);
+            if (test[0] == target[0] && test[1] == target[1] &&
+                test[2] == target[2] && test[3] == target[3] &&
+                isValidMetadataVersion(test)) {
+                for (size_t i = 0; i < data.size(); ++i) data[i] ^= key4[i % 4] ^ static_cast<uint8_t>(i & 0xFF);
+                return true;
+            }
+        }
+
+        // Header-only XOR (256 bytes)
+        {
+            uint8_t key4[4];
+            for (int i = 0; i < 4; ++i) key4[i] = target[i] ^ data[i];
+            size_t headerSize = std::min<size_t>(256, data.size());
+            std::vector<uint8_t> test(data.begin(), data.end());
+            for (size_t i = 0; i < headerSize; ++i) test[i] ^= key4[i % 4];
+            if (test[0] == target[0] && test[1] == target[1] &&
+                test[2] == target[2] && test[3] == target[3] &&
+                isValidMetadataVersion(test)) {
+                for (size_t i = 0; i < headerSize; ++i) data[i] ^= key4[i % 4];
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // ── Metadata Parsing ──
+    // Reads actual offsets from metadata header using profile positions.
+static void parseMetadata(const std::vector<uint8_t>& data,
+                              const std::shared_ptr<IEngineProfile>& profile,
+                              DumpData& result,
+                              ProgressCallback progress) {
+        // Read actual offsets and counts from metadata header.
+        // profile->offsetOf() gives us the header byte positions.
+        size_t typeDefFileOffset = static_cast<size_t>(
+            readU32(data, profile->offsetOf("typeDefinitionsOffset")));
+        uint32_t typeDefCount = readU32(data, profile->offsetOf("typeDefinitionCount"));
+        size_t methodDefFileOffset = static_cast<size_t>(
+            readU32(data, profile->offsetOf("methodDefinitionOffset")));
+        uint32_t methodDefCount = readU32(data, profile->offsetOf("methodDefinitionCount"));
+        size_t fieldDefFileOffset = static_cast<size_t>(
+            readU32(data, profile->offsetOf("fieldDefinitionOffset")));
+        uint32_t fieldDefCount = readU32(data, profile->offsetOf("fieldDefinitionCount"));
+        size_t stringLiteralFileOffset = static_cast<size_t>(
+            readU32(data, profile->offsetOf("stringLiteralOffset")));
+        size_t stringLiteralDataFileOffset = static_cast<size_t>(
+            readU32(data, profile->offsetOf("stringLiteralDataOffset")));
+
         size_t typeDefStructSize = profile->structSize("Il2CppTypeDefinition");
         size_t methodDefStructSize = profile->structSize("Il2CppMethodDefinition");
         size_t fieldDefStructSize = profile->structSize("Il2CppFieldDefinition");
-        size_t imageDefStructSize = profile->structSize("Il2CppImageDefinition");
 
-        // Parse type definitions
-        if (typeDefOffset > 0 && typeDefCount > 0 && typeDefStructSize > 0) {
-            parseTypeDefinitions(data, typeDefOffset, typeDefCount,
-                                 typeDefStructSize, result);
+        // Parse string literals first (needed for name resolution).
+        if (progress) progress("Parsing string literals...");
+        if (stringLiteralFileOffset > 0 && stringLiteralDataFileOffset > 0) {
+            parseStringLiterals(data, stringLiteralFileOffset,
+                                stringLiteralDataFileOffset, result);
         }
 
-        // Parse method definitions
-        if (methodDefOffset > 0 && methodDefCount > 0 && methodDefStructSize > 0) {
-            parseMethodDefinitions(data, methodDefOffset, methodDefCount,
-                                    methodDefStructSize, result);
+        // Parse type/method/field definitions with name resolution via string data.
+        if (progress) progress("Parsing type definitions...");
+        if (typeDefFileOffset > 0 && typeDefCount > 0 && typeDefStructSize > 0) {
+            parseTypeDefinitions(data, typeDefFileOffset, typeDefCount,
+                                 typeDefStructSize, stringLiteralDataFileOffset, result);
         }
 
-        // Parse field definitions
-        if (fieldDefOffset > 0 && fieldDefCount > 0 && fieldDefStructSize > 0) {
-            parseFieldDefinitions(data, fieldDefOffset, fieldDefCount,
-                                   fieldDefStructSize, result);
+        if (progress) progress("Parsing method definitions...");
+        if (methodDefFileOffset > 0 && methodDefCount > 0 && methodDefStructSize > 0) {
+            parseMethodDefinitions(data, methodDefFileOffset, methodDefCount,
+                                   methodDefStructSize, stringLiteralDataFileOffset, result);
         }
 
-        // Parse string literals
-        if (stringLiteralOffset > 0 && stringLiteralDataOffset > 0) {
-            parseStringLiterals(data, stringLiteralOffset, stringLiteralDataOffset,
-                                 result);
+        if (progress) progress("Parsing field definitions...");
+        if (fieldDefFileOffset > 0 && fieldDefCount > 0 && fieldDefStructSize > 0) {
+            parseFieldDefinitions(data, fieldDefFileOffset, fieldDefCount,
+                                  fieldDefStructSize, stringLiteralDataFileOffset, result);
         }
 
-        result.setMeta("typeCount", std::to_string(result.typeTable.size()));
-        result.setMeta("methodCount", std::to_string(result.methodTable.size()));
-        result.setMeta("fieldCount", std::to_string(result.fieldTable.size()));
-        result.setMeta("stringCount", std::to_string(result.stringTable.size()));
-        result.success = true;
-        return result;
+        // Resolve method declaring types now that typeTable is populated.
+        resolveMethodDeclaringTypes(result);
+        resolveFieldDeclaringTypes(result);
     }
 
-    // Parse Il2CppTypeDefinition array
-    static void parseTypeDefinitions(const std::vector<uint8_t>& data,
-                                      size_t offset, uint32_t count,
-                                      size_t structSize, DumpData& result) {
-        // Il2CppTypeDefinition fields (common across versions):
-        //   +0x00: nameIndex (u32) — index into string heap
-        //   +0x04: namespaceIndex (u32)
-        //   +0x08: bitfield (u32) — flags, generic params, etc.
-        //   +0x0C: genericContainerIndex (u32)
-        //   +0x10: parentIndex (u32) — index to parent type
-        //   +0x14: declaringTypeIndex (u32)
-        //   +0x18: interfacesStart (u32)
-        //   +0x1C: interfacesCount (u16)
-        //   +0x1E: methodStart (u32)
-        //   +0x22: methodCount (u16)
-        //   +0x24: fieldStart (u32)
-        //   +0x28: fieldCount (u16)
-
+static void parseTypeDefinitions(const std::vector<uint8_t>& data,
+                                       size_t offset, uint32_t count,
+                                       size_t structSize, size_t stringDataOffset,
+                                       DumpData& result) {
         for (uint32_t i = 0; i < count; ++i) {
             size_t entryOff = offset + (i * structSize);
             if (entryOff + structSize > data.size()) break;
 
             TypeEntry type;
             type.typeId = i;
-            type.name = "Type_" + std::to_string(i);  // placeholder, resolved via string heap
             type.address = entryOff;
 
-            // Read method count for size metadata
-            if (structSize >= 0x24) {
-                uint16_t methodCount = static_cast<uint16_t>(
-                    readU32(data, entryOff + 0x22) & 0xFFFF);
-                type.size = methodCount;  // store method count temporarily
+            // nameIndex at offset 0x00 — resolve from string data blob.
+            uint32_t nameIndex = readU32(data, entryOff);
+            type.name = readNameFromData(data, stringDataOffset, nameIndex);
+            if (type.name.empty()) {
+                type.name = "Type_" + std::to_string(i);
+            }
+
+            // namespaceIndex at offset 0x04 (not stored in TypeEntry, but could be used later).
+            // parentIndex at offset 0x14 (v24): index into TypeDef table.
+            if (structSize >= 0x18) {
+                uint32_t parentIdx = readU32(data, entryOff + 0x14);
+                if (parentIdx < count) {
+                    // Will be resolved in a second pass if needed.
+                    type.parentType = "Type_" + std::to_string(parentIdx);
+                }
             }
 
             result.typeTable.push_back(type);
         }
     }
 
-    // Parse Il2CppMethodDefinition array
-    static void parseMethodDefinitions(const std::vector<uint8_t>& data,
-                                        size_t offset, uint32_t count,
-                                        size_t structSize, DumpData& result) {
+static void parseMethodDefinitions(const std::vector<uint8_t>& data,
+                                         size_t offset, uint32_t count,
+                                         size_t structSize, size_t stringDataOffset,
+                                         DumpData& result) {
         for (uint32_t i = 0; i < count; ++i) {
             size_t entryOff = offset + (i * structSize);
             if (entryOff + structSize > data.size()) break;
 
             MethodEntry method;
             method.methodIndex = i;
-            method.name = "Method_" + std::to_string(i);
 
-            // +0x04: declaringTypeIndex
+            // nameIndex at offset 0x00 — resolve from string data blob.
+            uint32_t nameIndex = readU32(data, entryOff);
+            method.name = readNameFromData(data, stringDataOffset, nameIndex);
+            if (method.name.empty()) {
+                method.name = "Method_" + std::to_string(i);
+            }
+
+            // declaringTypeIndex at offset 0x04 (index into TypeDef table).
             uint32_t declaringTypeIndex = readU32(data, entryOff + 0x04);
             method.declaringType = "Type_" + std::to_string(declaringTypeIndex);
 
@@ -215,18 +361,25 @@ private:
         }
     }
 
-    // Parse Il2CppFieldDefinition array
-    static void parseFieldDefinitions(const std::vector<uint8_t>& data,
-                                       size_t offset, uint32_t count,
-                                       size_t structSize, DumpData& result) {
+static void parseFieldDefinitions(const std::vector<uint8_t>& data,
+                                        size_t offset, uint32_t count,
+                                        size_t structSize, size_t stringDataOffset,
+                                        DumpData& result) {
         for (uint32_t i = 0; i < count; ++i) {
             size_t entryOff = offset + (i * structSize);
             if (entryOff + structSize > data.size()) break;
 
             FieldEntry field;
-            field.name = "Field_" + std::to_string(i);
 
-            // +0x08: parentIndex (declaring type)
+            // nameIndex at offset 0x00 — resolve from string data blob.
+            uint32_t nameIndex = readU32(data, entryOff);
+            field.name = readNameFromData(data, stringDataOffset, nameIndex);
+            if (field.name.empty()) {
+                field.name = "Field_" + std::to_string(i);
+            }
+
+            // typeIndex at offset 0x04 (index into TypeDef/encoded type).
+            // parentIndex at offset 0x08 (index into TypeDef table).
             uint32_t parentIndex = readU32(data, entryOff + 0x08);
             field.declaringType = "Type_" + std::to_string(parentIndex);
 
@@ -234,11 +387,9 @@ private:
         }
     }
 
-    // Parse string literal table
-    static void parseStringLiterals(const std::vector<uint8_t>& data,
+static void parseStringLiterals(const std::vector<uint8_t>& data,
                                      size_t tableOffset, size_t dataOffset,
                                      DumpData& result) {
-        // String literal table: count (u32) + entries (length u32 + data offset u32)
         if (tableOffset + 4 > data.size()) return;
 
         uint32_t count = readU32(data, tableOffset);
@@ -250,11 +401,10 @@ private:
             pos += 8;
 
             StringEntry entry;
-            entry.address = dataOffset + dataIdx;
-
-            // Read string from data section
             size_t strAbsOffset = dataOffset + dataIdx;
-            if (strAbsOffset + length <= data.size()) {
+            entry.address = strAbsOffset;
+
+            if (strAbsOffset + length <= data.size() && length < 1024 * 1024) {
                 entry.value = std::string(
                     reinterpret_cast<const char*>(data.data() + strAbsOffset), length);
             }
@@ -262,9 +412,33 @@ private:
             result.stringTable.push_back(entry);
         }
     }
+
+    // ── Type Resolution ──
+    // Resolves generic "Type_N" references to actual class names.
+static void resolveMethodDeclaringTypes(DumpData& result) {
+        for (auto& method : result.methodTable) {
+            // declaringType is "Type_N" where N is the index. Look up real name.
+            uint32_t idx = 0;
+            const std::string& dt = method.declaringType;
+            if (dt.size() > 5 && dt.compare(0, 5, "Type_") == 0) {
+                idx = static_cast<uint32_t>(std::stoul(dt.substr(5)));
+            }
+            if (idx < result.typeTable.size()) {
+                method.declaringType = result.typeTable[idx].name;
+            }
+        }
+    }
+
+static void resolveFieldDeclaringTypes(DumpData& result) {
+        for (auto& field : result.fieldTable) {
+            uint32_t idx = 0;
+            const std::string& dt = field.declaringType;
+            if (dt.size() > 5 && dt.compare(0, 5, "Type_") == 0) {
+                idx = static_cast<uint32_t>(std::stoul(dt.substr(5)));
+            }
+            if (idx < result.typeTable.size()) {
+                field.declaringType = result.typeTable[idx].name;
+            }
+        }
+    }
 };
-
-// Static magic constant
-const uint32_t UnityIL2CPPAnalyzer::kIl2CppMagic;
-
-} // namespace omnibyte::dumper::unityil2cpp
