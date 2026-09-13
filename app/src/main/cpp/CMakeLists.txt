@@ -22,7 +22,6 @@ set(OMNIBYTE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../")
 add_subdirectory(${OMNIBYTE_ROOT}/engine-core engine-core)
 add_subdirectory(${OMNIBYTE_ROOT}/runtime runtime)
 add_subdirectory(${OMNIBYTE_ROOT}/modules/Dumper dumper)
-add_subdirectory(${OMNIBYTE_ROOT}/modules/Dumper1 dumper1)
 add_subdirectory(${OMNIBYTE_ROOT}/modules/Hooker hooker)
 
 # ---------------------------------------------------------------------------
@@ -34,7 +33,6 @@ target_include_directories(omnibyte PRIVATE
     ${OMNIBYTE_ROOT}/engine-core
     ${OMNIBYTE_ROOT}/runtime
     ${OMNIBYTE_ROOT}/modules/Dumper
-    ${OMNIBYTE_ROOT}/modules/Dumper1
     ${OMNIBYTE_ROOT}/modules/Hooker
 )
 

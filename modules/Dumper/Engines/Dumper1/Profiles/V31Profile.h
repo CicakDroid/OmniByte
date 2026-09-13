@@ -2,7 +2,7 @@
 // Dumper1 — IL2CPP v31 profile (Unity 2022.2+ / Unity 6000.x).
 // Source: il2cpp-dumper-rs metadata.rs + Perfare/Il2CppDumper MetadataClass.cs
 // Header: SAME layout as V29; struct differences in Il2CppMethodDefinition (adds returnParameterToken)
-#include "../../Dumper/DumperCore/IEngineProfile.h"
+#include "../../DumperCore/IEngineProfile.h"
 #include <string>
 #include <cstdint>
 #include <cstring>
