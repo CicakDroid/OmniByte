@@ -23,7 +23,7 @@
 
 OmniByte is an Android reverse engineering toolkit built on **Kotlin + C++ Native**, supporting multi-architecture (**ARMv7** & **ARMv8a**) and multi-version Android (**6.0 to the latest release**).
 
-The toolkit is designed for static & dynamic analysis, decompilation, binary editing, function hooking, memory editing, and network monitoring, capture & editing — all in a single integrated platform.
+The toolkit is designed for static & dynamic analysis, decompilation, binary editing, function hooking, memory editing, and network monitoring, capture & editing — all in a single integrated platform. **Without lifting to LLVM**.
 
 ## Key Features
 
