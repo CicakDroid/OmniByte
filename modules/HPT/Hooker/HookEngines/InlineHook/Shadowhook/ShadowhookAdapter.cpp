@@ -32,40 +32,6 @@ extern "C" {
 
 namespace omnibyte::runtime::backends {
 
-// --- Updater ---
-
-static constexpr const char* GITHUB_API_URL =
-    "https://api.github.com/repos/bytedance/android-inline-hook/releases/latest";
-static constexpr const char* EMBEDDED_VERSION = "2.0.1";
-
-std::string ShadowhookAdapter::fetchLatestVersion() {
-    FILE* pipe = popen("curl -s -H 'Accept: application/vnd.github.v3+json' " GITHUB_API_URL, "r");
-    if (!pipe) return "";
-
-    char buf[256];
-    std::string response;
-    while (fgets(buf, sizeof(buf), pipe)) {
-        response += buf;
-    }
-    pclose(pipe);
-
-    // Extract "tag_name":"vX.Y.Z"
-    auto pos = response.find("\"tag_name\":\"");
-    if (pos == std::string::npos) return "";
-    pos += 12;
-    auto end = response.find('"', pos);
-    if (end == std::string::npos) return "";
-    return response.substr(pos, end - pos);
-}
-
-bool ShadowhookAdapter::downloadRelease(const std::string& version, const std::string& destPath) {
-    std::string url = "https://github.com/bytedance/android-inline-hook/releases/download/"
-                      + version + "/libshadowhook.so";
-    std::string cmd = "curl -sL -o '" + destPath + "' '" + url + "'";
-    int rc = system(cmd.c_str());
-    return rc == 0;
-}
-
 // --- Lifecycle ---
 
 ShadowhookAdapter::~ShadowhookAdapter() {
@@ -185,44 +151,6 @@ bool ShadowhookAdapter::unhook(uintptr_t addr) {
 bool ShadowhookAdapter::patchMemory(uintptr_t addr, const uint8_t* data, size_t size) {
     LOGW("patchMemory not supported by Shadowhook — use KittyMemory backend");
     return false;
-}
-
-// --- Updater ---
-
-std::string ShadowhookAdapter::checkAndUpdate(const char* downloadDir) {
-    std::string latest = fetchLatestVersion();
-    if (latest.empty()) {
-        LOGW("Could not fetch latest shadowhook version");
-        return EMBEDDED_VERSION;
-    }
-
-    LOGI("Embedded shadowhook: %s, latest: %s", EMBEDDED_VERSION, latest.c_str());
-
-    if (latest == EMBEDDED_VERSION) {
-        LOGI("Already on latest version");
-        return EMBEDDED_VERSION;
-    }
-
-    if (!downloadDir) {
-        LOGW("No download dir specified, skipping update");
-        return EMBEDDED_VERSION;
-    }
-
-    std::string destPath = std::string(downloadDir) + "/libshadowhook.so";
-    if (downloadRelease(latest, destPath)) {
-        LOGI("Downloaded shadowhook %s to %s", latest.c_str(), destPath.c_str());
-
-        // Verify file exists and has content
-        struct stat st;
-        if (stat(destPath.c_str(), &st) == 0 && st.st_size > 0) {
-            LOGI("Update verified: %s (%ld bytes)", destPath.c_str(), (long)st.st_size);
-            return latest;
-        }
-        LOGW("Downloaded file missing or empty after save");
-    }
-
-    LOGW("Update download failed, staying on %s", EMBEDDED_VERSION);
-    return EMBEDDED_VERSION;
 }
 
 } // namespace omnibyte::runtime::backends

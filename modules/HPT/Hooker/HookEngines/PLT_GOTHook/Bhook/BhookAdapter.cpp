@@ -32,40 +32,6 @@ extern "C" {
 
 namespace omnibyte::runtime::backends {
 
-// --- Updater ---
-
-static constexpr const char* GITHUB_API_URL =
-    "https://api.github.com/repos/bytedance/bhook/releases/latest";
-static constexpr const char* EMBEDDED_VERSION = "1.1.2";
-
-std::string BhookAdapter::fetchLatestVersion() {
-    FILE* pipe = popen("curl -s -H 'Accept: application/vnd.github.v3+json' " GITHUB_API_URL, "r");
-    if (!pipe) return "";
-
-    char buf[256];
-    std::string response;
-    while (fgets(buf, sizeof(buf), pipe)) {
-        response += buf;
-    }
-    pclose(pipe);
-
-    // Extract "tag_name":"vX.Y.Z"
-    auto pos = response.find("\"tag_name\":\"");
-    if (pos == std::string::npos) return "";
-    pos += 12;
-    auto end = response.find('"', pos);
-    if (end == std::string::npos) return "";
-    return response.substr(pos, end - pos);
-}
-
-bool BhookAdapter::downloadRelease(const std::string& version, const std::string& destPath) {
-    std::string url = "https://github.com/bytedance/bhook/releases/download/"
-                      + version + "/libbytehook.so";
-    std::string cmd = "curl -sL -o '" + destPath + "' '" + url + "'";
-    int rc = system(cmd.c_str());
-    return rc == 0;
-}
-
 // --- Lifecycle ---
 
 BhookAdapter::~BhookAdapter() {
@@ -172,44 +138,6 @@ bool BhookAdapter::unhook(uintptr_t addr) {
 bool BhookAdapter::patchMemory(uintptr_t addr, const uint8_t* data, size_t size) {
     LOGW("patchMemory not supported by Bhook — use KittyMemory backend");
     return false;
-}
-
-// --- Updater ---
-
-std::string BhookAdapter::checkAndUpdate(const char* downloadDir) {
-    std::string latest = fetchLatestVersion();
-    if (latest.empty()) {
-        LOGW("Could not fetch latest bhook version");
-        return EMBEDDED_VERSION;
-    }
-
-    LOGI("Embedded bhook: %s, latest: %s", EMBEDDED_VERSION, latest.c_str());
-
-    if (latest == EMBEDDED_VERSION) {
-        LOGI("Already on latest version");
-        return EMBEDDED_VERSION;
-    }
-
-    if (!downloadDir) {
-        LOGW("No download dir specified, skipping update");
-        return EMBEDDED_VERSION;
-    }
-
-    std::string destPath = std::string(downloadDir) + "/libbytehook.so";
-    if (downloadRelease(latest, destPath)) {
-        LOGI("Downloaded bhook %s to %s", latest.c_str(), destPath.c_str());
-
-        // Verify file exists and has content
-        struct stat st;
-        if (stat(destPath.c_str(), &st) == 0 && st.st_size > 0) {
-            LOGI("Update verified: %s (%ld bytes)", destPath.c_str(), (long)st.st_size);
-            return latest;
-        }
-        LOGW("Downloaded file missing or empty after save");
-    }
-
-    LOGW("Update download failed, staying on %s", EMBEDDED_VERSION);
-    return EMBEDDED_VERSION;
 }
 
 } // namespace omnibyte::runtime::backends

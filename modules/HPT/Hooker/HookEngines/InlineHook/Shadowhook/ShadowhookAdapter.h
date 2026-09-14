@@ -70,16 +70,7 @@ public:
     /// Get last init error code.
     int getInitError() const { return initError_; }
 
-    /// Check for newer shadowhook release on GitHub and download if available.
-    /// Returns version string of installed release, or empty on failure.
-    std::string checkAndUpdate(const char* downloadDir);
-
 private:
-    /// Fetch latest release tag from GitHub API.
-    std::string fetchLatestVersion();
-
-    /// Download release artifact to `destPath`. Returns true on success.
-    bool downloadRelease(const std::string& version, const std::string& destPath);
 
     bool initialized_ = false;
     int initError_ = -1;

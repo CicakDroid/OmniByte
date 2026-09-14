@@ -59,22 +59,12 @@ public:
     /// Get Albatross init status (STATUS_INIT_OK=1, STATUS_DISABLED=2, etc.).
     int getInitStatus() const { return initStatus_; }
 
-    /// Check for newer Albatross release on GitHub and download if available.
-    /// Returns version string of installed release, or empty on failure.
-    std::string checkAndUpdate(JNIEnv* env, const char* downloadDir);
-
 private:
     /// Resolve a native address to a java.lang.reflect.Method via art::ArtMethod introspection.
     jobject resolveMethodFromAddress(JNIEnv* env, uintptr_t addr);
 
     /// Cache Albatross class/method JNI references.
     bool cacheJNIClasses(JNIEnv* env);
-
-    /// Fetch latest release tag from GitHub API.
-    std::string fetchLatestVersion();
-
-    /// Download release artifact to `destPath`. Returns true on success.
-    bool downloadRelease(const std::string& version, const std::string& destPath);
 
     bool initialized_ = false;
     int initStatus_ = 4; // STATUS_NOT_INIT
