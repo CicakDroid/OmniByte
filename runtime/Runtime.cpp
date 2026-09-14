@@ -20,7 +20,7 @@ DR Runtime::attach(pid_t pid, const RuntimeConfig& cfg) {
         }
     }
 
-    hpt_.selectBackend(cfg.hookBackendPriority);
+    hptManager_.initialize(cfg);
 
     return DR::Success;
 }
@@ -28,7 +28,7 @@ DR Runtime::attach(pid_t pid, const RuntimeConfig& cfg) {
 void Runtime::detach() {
     if (!isAttached()) return;
 
-    hpt_.release();
+    hptManager_.release();
 
     if (zigZagManager_.activeBackend()) {
         zigZagManager_.deactivate();
@@ -68,7 +68,7 @@ DR Runtime::activateStealth(pid_t pid) {
 
 DR Runtime::installHook(uintptr_t addr, void* replacement, void** originalOut) {
     if (!isAttached()) return DR::InvalidRequest;
-    if (!hpt_.hookFunction(addr, replacement, originalOut)) {
+    if (!hptManager_.hookFunction(addr, replacement, originalOut)) {
         return DR::HookFailed;
     }
     return DR::Success;

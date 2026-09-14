@@ -8,7 +8,7 @@
 #include "SymbolResolver/SymbolResolver.h"
 #include "FreedomService/FreedomService.h"
 #include "ZigZagManager/ZigZagManager.h"
-#include "HPT/HPT.h"
+#include "HPTManager/HPTManager.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -55,7 +55,7 @@ private:
     SymbolResolver symbolResolver_;
     FreedomService freedomService_;
     ZigZagManager zigZagManager_;
-    HPT hpt_;
+    HPTManager hptManager_;
 };
 
 } // namespace omnibyte::runtime

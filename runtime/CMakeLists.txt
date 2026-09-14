@@ -15,6 +15,7 @@ add_subdirectory(FreedomService)
 add_subdirectory(ZigZag)
 add_subdirectory(ZigZagManager)
 add_subdirectory(HPT)
+add_subdirectory(HPTManager)
 add_subdirectory(Bridges)
 
 target_include_directories(runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../..)
@@ -26,6 +27,7 @@ target_link_libraries(runtime PUBLIC
     zigzag
     zigzag_manager
     hpt
+    hpt_manager
     bridge_freedom_service
     bridge_module
     dumper
