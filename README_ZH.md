@@ -25,6 +25,12 @@ OmniByte 是一个基于 **Kotlin + C++ Native** 构建的 Android 逆向工程�
 
 该工具包专为静态和动态分析、反编译、二进制编辑、函数 Hooking、内存编辑以及网络监控、捕获与编辑而设计 — 全部集成在一个统一平台中。**无需提升至 LLVM**。
 
+**特殊功能：**
+- ✅ **支持 root 和非 root 运行** — 支持 root 访问（KernelSU, Magisk, SukiSU）和通过 `/proc/pid/mem` 的非 root 模式
+- 🔍 **Universal Dumper for Android Native Library** — 转储 Android 进程的所有 `.so` 库（libil2cpp.so, libtamarin.so, libunity.so 等）
+- ⚡ **HPT Orchestrator** — 通过 Hooking/MemoryEditing 子系统编排 hooking & 内存编辑
+- 🔄 **Taskflow Adapter** — 适配 taskflow 用于调度和并行化
+
 ## 主要功能
 
 | 功能 | 描述 |
@@ -33,9 +39,9 @@ OmniByte 是一个基于 **Kotlin + C++ Native** 构建的 Android 逆向工程�
 | ✏️ **APK 编辑器** | 编辑清单、资源、smali 并重新构建 APK |
 | 📊 **二进制分析** | 静态二进制分析（ELF/PE），包含反汇编器和反编译器 |
 | 🔧 **二进制编辑器** | 直接编辑二进制文件，支持十六进制编辑器和补丁 |
-| 📦 **Binary Dumper** | 手动或在 Live PID 期间自动转储二进制结构 |
-| 🪝 **Hooking** | 使用 4 种不同技术 Hook 原生函数和 ART 方法 |
-| 🧠 **内存编辑器** | 读写活动进程内存 |
+| 📦 **Universal Dumper** | 转储 Android 通用原生库（所有引擎：Unity, Unreal, Godot 等），支持手动或 Live PID 自动转储 |
+| 🪝 **Hooking** | 使用 4 种后端（Albatross, Bhook, Vector, KittyMemory）Hook 原生函数和 ART 方法 |
+| 🧠 **内存编辑器** | 通过 KittyMemory/KittyMemoryEx 读写活动进程内存 |
 | 🌐 **网络监控、捕获与编辑** | 实时监控、捕获和编辑网络数据包 |
 
 ## 平台支持
@@ -79,7 +85,7 @@ OmniByte/
 │   │   └── docs/
 │   └── Shared/                   # 共享元数据
 ├── modules/
-│   ├── Dumper/                   # Binary Dumper 模块
+│   ├── Dumper/                   # Universal Dumper 模块
 │   │   ├── DumperCore/           # 核心 dumper 逻辑
 │   │   │   ├── Detector/         # 引擎检测
 │   │   │   ├── EngineRegistry/   # 引擎注册
@@ -109,9 +115,9 @@ OmniByte/
 │   │       ├── KittyMemory/      # 内存补丁
 │   │       ├── KittyMemoryEx/    # 扩展内存
 │   │       └── Vector/           # 无痕后端
-│   └── HPT/                      # HPT 模块
-│       ├── Hooker/               # Hook 封装
-│       └── MemoryEditor/         # 内存编辑器
+│   └── HPT/                      # HPT Orchestrator 模块
+│       ├── Hooker/               # Hooking 子系统 (IHookBackend)
+│       └── MemoryEditor/         # 内存编辑子系统 (IMemoryEditor)
 ├── runtime/                      # 活跃设备运行时
 │   ├── Bridges/                  # 桥接加载器
 │   │   ├── FreedomServiceBridge/ # Root 服务桥接
@@ -121,6 +127,7 @@ OmniByte/
 │   ├── SymbolResolver/           # 符号解析 (xdl)
 │   ├── ZigZag/                   # 隐身/绕过引擎
 │   ├── ZigZagManager/            # 隐身管理
+│   ├── HPTManager/               # HPT 生命周期管理
 │   └── FreedomService/           # Root 访问服务
 │       ├── KernelSU-Next/        # KernelSU 支持
 │       ├── SUI/                  # Magisk SUI 支持
@@ -128,7 +135,8 @@ OmniByte/
 │       └── RootThread/           # Root 线程管理
 ├── common/                       # 共享工具类
 │   ├── Math/                     # 数学工具
-│   └── Serialization/            # 序列化
+│   ├── Json/                     # 序列化
+│   └── Taskflow/                 # Taskflow 适配器 (FetchContent v3.8.0)
 ├── toolchain/                    # 构建工具链
 │   ├── rizin-android/            # Rizin 反汇编器
 │   └── stub-headers/             # 桩头文件
@@ -160,7 +168,7 @@ flowchart TB
         H_PLG --> H_ORC
     end
 
-    subgraph DUMPER["Dumper - 二进制转储"]
+    subgraph DUMPER["Universal Dumper - Android 原生库"]
         direction TB
         D_DET["检测器\n(Magic Bytes,\n版本检查)"]
         D_ENG["引擎\n(UnityIL2CPP, UnityMono,\nUnrealEngine, Godot,\nCocos2d, GameMaker, Source2)"]
@@ -171,16 +179,20 @@ flowchart TB
         D_RES --> D_EXP
     end
 
-    subgraph HOOKER["Hooker - 函数 Hooking"]
+    subgraph HPT["HPT Orchestrator"]
         direction TB
-        HK_ART["ART Hook\n(Albatross)"]
-        HK_INL["Inline Hook\n(android-inline-hook)"]
-        HK_PLT["PLT/GOT Hook\n(Bhook)"]
-        HK_TLS["无痕 Hook\n(Vector)"]
+        HK_MOD["Hooking 子系统\n(IHookBackend)"]
+        ME_MOD["内存编辑子系统\n(IMemoryEditor)"]
+        HK_MOD --> HK_ART["ART Hook\n(Albatross)"]
+        HK_MOD --> HK_INL["Inline Hook\n(android-inline-hook)"]
+        HK_MOD --> HK_PLT["PLT/GOT Hook\n(Bhook)"]
+        HK_MOD --> HK_TLS["无痕 Hook\n(Vector)"]
         HK_ART --> HK_MEM["内存补丁\n(KittyMemory)"]
         HK_INL --> HK_MEM
         HK_PLT --> HK_MEM
         HK_TLS --> HK_MEM
+        ME_MOD --> ME_KIT["KittyMemory"]
+        ME_MOD --> ME_KITX["KittyMemoryEx"]
     end
 
     subgraph RUNTIME["运行时 - 活跃设备"]
@@ -190,11 +202,19 @@ flowchart TB
         R_MIO["MemoryIO"]
         R_SYM["SymbolResolver\n(xdl)"]
         R_ZZ["ZigZag\n(隐身/绕过)"]
+        R_HPT["HPTManager\n(生命周期)"]
         R_FS["FreedomService\n(KernelSU, SUI, SukiSU)"]
         R_BRG --> R_PM
         R_PM --> R_MIO
         R_PM --> R_SYM
         R_ZZ --> R_FS
+        R_HPT --> HK_MOD
+        R_HPT --> ME_MOD
+    end
+
+    subgraph TASKFLOW["Taskflow - 并行调度"]
+        direction TB
+        TF["TaskflowAdapter\n(FetchContent v3.8.0)"]
     end
 
     subgraph OUTPUT["输出"]
@@ -218,6 +238,8 @@ flowchart TB
     HK_MEM --> O_PT
     R_MIO --> HK_MEM
     R_SYM --> D_RES
+    TF --> HK_MOD
+    TF --> ME_MOD
 ```
 
 ## 模块架构
@@ -225,15 +247,22 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph CORE["基础层"]
-        COMMON["common/\n(Math, Serialization)"]
+        COMMON["common/\n(Math, Json, Taskflow)"]
         TOOLCHAIN["toolchain/\n(Rizin, Headers)"]
     end
 
     subgraph NATIVE["原生层 (C++17)"]
         HYDRA["Hydra / Hydra2D\n静态分析"]
-        DUMPER["Dumper\n二进制转储"]
-        HOOKER["Hooker\n函数 Hooking"]
+        DUMPER["Universal Dumper\nAndroid 原生库转储"]
+        HPT["HPT Orchestrator\nHooking + MemoryEditing"]
         RUNTIME["Runtime\n活跃设备"]
+    end
+
+    subgraph HOOKS["Hook 后端"]
+        HK_ART["Albatross\n(ART Hook)"]
+        HK_BHK["Bhook\n(PLT/GOT)"]
+        HK_VEC["Vector\n(Traceless)"]
+        HK_KIT["KittyMemory\n(内存补丁)"]
     end
 
     subgraph UI["UI 层 (Kotlin)"]
@@ -242,17 +271,21 @@ flowchart LR
 
     CORE --> HYDRA
     CORE --> DUMPER
-    CORE --> HOOKER
+    CORE --> HPT
     CORE --> RUNTIME
     TOOLCHAIN --> HYDRA
 
     HYDRA --> DUMPER
     RUNTIME --> DUMPER
-    RUNTIME --> HOOKER
+    RUNTIME --> HPT
+    HPT --> HK_ART
+    HPT --> HK_BHK
+    HPT --> HK_VEC
+    HPT --> HK_KIT
 
     HYDRA -.-> APP
     DUMPER -.-> APP
-    HOOKER -.-> APP
+    HPT -.-> APP
     RUNTIME -.-> APP
 ```
 
@@ -267,14 +300,15 @@ cd OmniByte
 ./gradlew assembleDebug
 
 # 或仅构建原生代码
-cd app/src/main/cpp
-mkdir build && cd build
-cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
-      -DANDROID_ABI=arm64-v8a \
-      -DANDROID_PLATFORM=android-23 \
-      ..
-make
+./scripts/build-native.sh
+
+# 使用特定选项构建
+./scripts/build-native.sh --abi arm64-v8a --api 23
+./scripts/build-native.sh --abi armeabi-v7a --api 21
+./scripts/build-native.sh --clean
 ```
+
+> **注意：** 原生构建需要 Android SDK 和 NDK。运行 `./scripts/build-native.sh --help` 查看所有选项。
 
 ## 许可证
 

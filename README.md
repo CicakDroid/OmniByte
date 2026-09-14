@@ -25,6 +25,12 @@ OmniByte adalah toolkit reverse engineering Android berbasis **Kotlin + C++ Nati
 
 Toolkit ini dirancang untuk analisis statis & dinamis, dekompilasi, editasi biner, hooking fungsi, editasi memori, serta monitoring, penangkapan & editasi jaringan — semua dalam satu platform terpadu. **Tanpa lifting ke LLVM**.
 
+**Fitur Khusus:**
+- ✅ **Berjalan dengan root DAN tanpa root** — Mendukung akses root (KernelSU, Magisk, SukiSU) dan mode non-root via `/proc/pid/mem`
+- 🔍 **Universal Dumper untuk Android Native Library** — Mendumping semua library `.so` dari proses Android (libil2cpp.so, libtamarin.so, libunity.so, dll.)
+- ⚡ **HPT Orchestrator** — Orkestrasi hooking & memory editing melalui Hooking/MemoryEditing subsystems
+- 🔄 **Taskflow Adapter** — Adaptasi taskflow untuk scheduling & parallelisasi
+
 ## Fitur Utama
 
 | Fitur | Deskripsi |
@@ -33,9 +39,9 @@ Toolkit ini dirancang untuk analisis statis & dinamis, dekompilasi, editasi bine
 | ✏️ **APK Editor** | Penampil & manipulasi manifest, resource, smali, dan rebuild APK |
 | 📊 **Analisis Biner** | Analisis statis & dinamis biner (ELF/PE) dengan disassembler & decompiler |
 | 🔧 **Editor Biner** | Penampil, ekplorasi & manipulasi biner langsung dengan hex editor & patching |
-| 📦 **Binary Dumper** | Dump struktur biner secara manual atau otomatis saat Live PID |
-| 🪝 **Hooking** | Hook fungsi native & ART method dengan 4 teknik berbeda |
-| 🧠 **Editor Memori** | Baca & tulis memori proses live |
+| 📦 **Universal Dumper** | Dump universal library Android native (semua engine: Unity, Unreal, Godot, dll.) secara manual atau otomatis saat Live PID |
+| 🪝 **Hooking** | Hook fungsi native & ART method dengan 4 backend (Albatross, Bhook, Vector, KittyMemory) |
+| 🧠 **Editor Memori** | Baca & tulis memori proses live via KittyMemory/KittyMemoryEx |
 | 🌐 **Monitoring, Penangkapan & Editasi Jaringan** | Monitor, tangkap, dan edit paket jaringan secara real-time |
 
 ## Dukungan Platform
@@ -79,7 +85,7 @@ OmniByte/
 │   │   └── docs/
 │   └── Shared/                           # Metadata bersama
 ├── modules/
-│   ├── Dumper/                           # Modul Binary Dumper
+│   ├── Dumper/                           # Modul Universal Dumper
 │   │   ├── DumperCore/                   # Logika inti dumper
 │   │   │   ├── Detector/                 # Deteksi engine
 │   │   │   ├── EngineRegistry/           # Registrasi engine
@@ -109,9 +115,9 @@ OmniByte/
 │   │       ├── KittyMemory/      # Manipulasi memori
 │   │       ├── KittyMemoryEx/    # Ekstensi manipulasi memori
 │   │       └── Vector/           # Backend traceless
-│   └── HPT/                      # Modul HPT
-│       ├── Hooker/               # Wrapper hook
-│       └── MemoryEditor/         # Editor memori
+│   └── HPT/                      # Modul HPT Orchestrator
+│       ├── Hooker/               # Subsystem hooking (IHookBackend)
+│       └── MemoryEditor/         # Subsystem memory editing (IMemoryEditor)
 ├── runtime/                      # Runtime Perangkat Live
 │   ├── Bridges/                  # Pemuat jembatan
 │   │   ├── FreedomServiceBridge/ # Jembatan layanan root
@@ -121,6 +127,7 @@ OmniByte/
 │   ├── SymbolResolver/           # Resolusi simbol (xdl)
 │   ├── ZigZag/                   # Mesin stealth/bypass
 │   ├── ZigZagManager/            # Manajemen stealth
+│   ├── HPTManager/               # Manajemen HPT lifecycle
 │   └── FreedomService/           # Layanan akses root
 │       ├── KernelSU-Next/        # Dukungan KernelSU
 │       ├── SUI/                  # Dukungan Magisk SUI
@@ -128,7 +135,8 @@ OmniByte/
 │       └── RootThread/           # Manajemen thread root
 ├── common/                       # Utilitas bersama
 │   ├── Math/                     # Utilitas matematika
-│   └── Json/                     # Serialisasi
+│   ├── Json/                     # Serialisasi
+│   └── Taskflow/                 # Taskflow adapter (FetchContent v3.8.0)
 ├── toolchain/                    # Toolchain build
 │   ├── rizin-android/            # Disassembler Rizin
 │   └── stub-headers/             # Header stub
@@ -160,7 +168,7 @@ flowchart TB
         H_PLG --> H_ORC
     end
 
-    subgraph DUMPER["Dumper - Dumper Biner"]
+    subgraph DUMPER["Universal Dumper - Dumper Android Native"]
         direction TB
         D_DET["Detektor\n(Magic Bytes,\nVerifikasi Versi)"]
         D_ENG["Engines\n(UnityIL2CPP, UnityMono,\nUnrealEngine, Godot,\nCocos2d, GameMaker, Source2)"]
@@ -171,16 +179,20 @@ flowchart TB
         D_RES --> D_EXP
     end
 
-    subgraph HOOKER["Hooker - Hooking Fungsi"]
+    subgraph HPT["HPT Orchestrator"]
         direction TB
-        HK_ART["ART Hook\n(Albatross)"]
-        HK_INL["Inline Hook\n(android-inline-hook)"]
-        HK_PLT["PLT/GOT Hook\n(Bhook)"]
-        HK_TLS["Traceless Hook\n(Vector)"]
+        HK_MOD["Hooking Subsystem\n(IHookBackend)"]
+        ME_MOD["MemoryEditing Subsystem\n(IMemoryEditor)"]
+        HK_MOD --> HK_ART["ART Hook\n(Albatross)"]
+        HK_MOD --> HK_INL["Inline Hook\n(android-inline-hook)"]
+        HK_MOD --> HK_PLT["PLT/GOT Hook\n(Bhook)"]
+        HK_MOD --> HK_TLS["Traceless Hook\n(Vector)"]
         HK_ART --> HK_MEM["Patching Memori\n(KittyMemory)"]
         HK_INL --> HK_MEM
         HK_PLT --> HK_MEM
         HK_TLS --> HK_MEM
+        ME_MOD --> ME_KIT["KittyMemory"]
+        ME_MOD --> ME_KITX["KittyMemoryEx"]
     end
 
     subgraph RUNTIME["Runtime - Perangkat Live"]
@@ -190,11 +202,19 @@ flowchart TB
         R_MIO["MemoryIO"]
         R_SYM["SymbolResolver\n(xdl)"]
         R_ZZ["ZigZag\n(Stealth/Bypass)"]
+        R_HPT["HPTManager\n(Lifecycle)"]
         R_FS["FreedomService\n(KernelSU, SUI, SukiSU)"]
         R_BRG --> R_PM
         R_PM --> R_MIO
         R_PM --> R_SYM
         R_ZZ --> R_FS
+        R_HPT --> HK_MOD
+        R_HPT --> ME_MOD
+    end
+
+    subgraph TASKFLOW["Taskflow - Parallel Scheduling"]
+        direction TB
+        TF["TaskflowAdapter\n(FetchContent v3.8.0)"]
     end
 
     subgraph OUTPUT["Output"]
@@ -218,6 +238,8 @@ flowchart TB
     HK_MEM --> O_PT
     R_MIO --> HK_MEM
     R_SYM --> D_RES
+    TF --> HK_MOD
+    TF --> ME_MOD
 ```
 
 ## Arsitektur Modul
@@ -225,15 +247,22 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph CORE["Lapisan Core"]
-        COMMON["common/\n(Math, Serialization)"]
+        COMMON["common/\n(Math, Json, Taskflow)"]
         TOOLCHAIN["toolchain/\n(Rizin, Headers)"]
     end
 
     subgraph NATIVE["Lapisan Native (C++17)"]
         HYDRA["Hydra / Hydra2D\nAnalisis Statis"]
-        DUMPER["Dumper\nDumping Biner"]
-        HOOKER["Hooker\nHooking Fungsi"]
+        DUMPER["Universal Dumper\nDumping Android Native"]
+        HPT["HPT Orchestrator\nHooking + MemoryEditing"]
         RUNTIME["Runtime\nPerangkat Live"]
+    end
+
+    subgraph HOOKS["Hooking Backends"]
+        HK_ART["Albatross\n(ART Hook)"]
+        HK_BHK["Bhook\n(PLT/GOT)"]
+        HK_VEC["Vector\n(Traceless)"]
+        HK_KIT["KittyMemory\n(Memory Patching)"]
     end
 
     subgraph UI["Lapisan UI (Kotlin)"]
@@ -242,17 +271,21 @@ flowchart LR
 
     CORE --> HYDRA
     CORE --> DUMPER
-    CORE --> HOOKER
+    CORE --> HPT
     CORE --> RUNTIME
     TOOLCHAIN --> HYDRA
 
     HYDRA --> DUMPER
     RUNTIME --> DUMPER
-    RUNTIME --> HOOKER
+    RUNTIME --> HPT
+    HPT --> HK_ART
+    HPT --> HK_BHK
+    HPT --> HK_VEC
+    HPT --> HK_KIT
 
     HYDRA -.-> APP
     DUMPER -.-> APP
-    HOOKER -.-> APP
+    HPT -.-> APP
     RUNTIME -.-> APP
 ```
 
@@ -267,14 +300,15 @@ cd OmniByte
 ./gradlew assembleDebug
 
 # Atau build native only
-cd app/src/main/cpp
-mkdir build && cd build
-cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
-      -DANDROID_ABI=arm64-v8a \
-      -DANDROID_PLATFORM=android-23 \
-      ..
-make
+./scripts/build-native.sh
+
+# Build dengan opsi tertentu
+./scripts/build-native.sh --abi arm64-v8a --api 23
+./scripts/build-native.sh --abi armeabi-v7a --api 21
+./scripts/build-native.sh --clean
 ```
+
+> **Catatan:** Build native membutuhkan Android SDK & NDK. Jalankan `./scripts/build-native.sh --help` untuk opsi lengkap.
 
 ## Lisensi
 

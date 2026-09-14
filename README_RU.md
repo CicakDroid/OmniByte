@@ -25,6 +25,12 @@ OmniByte — это инструментарий обратного инжене
 
 Инструментарий предназначен для статического и динамического анализа, декомпиляции, редактирования бинарников, хукинга функций, редактирования памяти, а также мониторинга, захвата и редактирования сети — всё в одной интегрированной платформе. **Без поднятия до LLVM**.
 
+**Особые возможности:**
+- ✅ **Работает с root И без root** — Поддерживает root-доступ (KernelSU, Magisk, SukiSU) и безroot-режим через `/proc/pid/mem`
+- 🔍 **Universal Dumper для Android Native Library** — Дамп всех библиотек `.so` из процессов Android (libil2cpp.so, libtamarin.so, libunity.so и т.д.)
+- ⚡ **HPT Orchestrator** — Оркестрация хукинга и редактирования памяти через подсистемы Hooking/MemoryEditing
+- 🔄 **Taskflow Adapter** — Адаптация taskflow для планирования и параллелизации
+
 ## Основные возможности
 
 | Возможность | Описание |
@@ -33,9 +39,9 @@ OmniByte — это инструментарий обратного инжене
 | ✏️ **APK Editor** | Редактирование манифеста, ресурсов, smali и пересборка APK |
 | 📊 **Анализ бинарников** | Статический анализ бинарников (ELF/PE) с дизассемблером и декомпилятором |
 | 🔧 **Редактор бинарников** | Прямое редактирование бинарников с hex-редактором и патчингом |
-| 📦 **Binary Dumper** | Дамп структуры бинарников вручную или автоматически во время Live PID |
-| 🪝 **Хукинг** | Хук нативных функций и методов ART с 4 различными техниками |
-| 🧠 **Редактор памяти** | Чтение и запись памяти активных процессов |
+| 📦 **Universal Dumper** | Дамп универсальных нативных библиотек Android (все движки: Unity, Unreal, Godot и т.д.) вручную или автоматически во время Live PID |
+| 🪝 **Хукинг** | Хук нативных функций и методов ART с 4 бэкендами (Albatross, Bhook, Vector, KittyMemory) |
+| 🧠 **Редактор памяти** | Чтение и запись памяти активных процессов через KittyMemory/KittyMemoryEx |
 | 🌐 **Мониторинг, захват и редактирование сети** | Мониторинг, захват и редактирование сетевых пакетов в реальном времени |
 
 ## Поддержка платформы
@@ -79,7 +85,7 @@ OmniByte/
 │   │   └── docs/
 │   └── Shared/                   # Общие метаданные
 ├── modules/
-│   ├── Dumper/                   # Модуль Binary Dumper
+│   ├── Dumper/                   # Модуль Universal Dumper
 │   │   ├── DumperCore/           # Основная логика дампера
 │   │   │   ├── Detector/         # Обнаружение движка
 │   │   │   ├── EngineRegistry/   # Регистрация движков
@@ -109,9 +115,9 @@ OmniByte/
 │   │       ├── KittyMemory/      # Патчинг памяти
 │   │       ├── KittyMemoryEx/    # Расширенная память
 │   │       └── Vector/           # Безследный бэкенд
-│   └── HPT/                      # Модуль HPT
-│       ├── Hooker/               # Обёртка хука
-│       └── MemoryEditor/         # Редактор памяти
+│   └── HPT/                      # Модуль HPT Orchestrator
+│       ├── Hooker/               # Подсистема хукинга (IHookBackend)
+│       └── MemoryEditor/         # Подсистема редактирования памяти (IMemoryEditor)
 ├── runtime/                      # Рантайм активного устройства
 │   ├── Bridges/                  # Загрузчики мостов
 │   │   ├── FreedomServiceBridge/ # Мост сервиса root
@@ -121,6 +127,7 @@ OmniByte/
 │   ├── SymbolResolver/           # Разрешение символов (xdl)
 │   ├── ZigZag/                   # Движок скрытности/обхода
 │   ├── ZigZagManager/            # Управление скрытностью
+│   ├── HPTManager/               # Управление жизненным циклом HPT
 │   └── FreedomService/           # Сервис root-доступа
 │       ├── KernelSU-Next/        # Поддержка KernelSU
 │       ├── SUI/                  # Поддержка Magisk SUI
@@ -128,7 +135,8 @@ OmniByte/
 │       └── RootThread/           # Управление потоком root
 ├── common/                       # Общие утилиты
 │   ├── Math/                     # Математические утилиты
-│   └── Serialization/            # Сериализация
+│   ├── Json/                     # Сериализация
+│   └── Taskflow/                 # Адаптер Taskflow (FetchContent v3.8.0)
 ├── toolchain/                    # Инструментальная цепочка
 │   ├── rizin-android/            # Дизассемблер Rizin
 │   └── stub-headers/             # Заглушки заголовков
@@ -160,7 +168,7 @@ flowchart TB
         H_PLG --> H_ORC
     end
 
-    subgraph DUMPER["Дампер - Бинарный дампер"]
+    subgraph DUMPER["Universal Dumper - Нативные библиотеки Android"]
         direction TB
         D_DET["Детектор\n(Magic Bytes,\nПроверка версии)"]
         D_ENG["Движки\n(UnityIL2CPP, UnityMono,\nUnrealEngine, Godot,\nCocos2d, GameMaker, Source2)"]
@@ -171,16 +179,20 @@ flowchart TB
         D_RES --> D_EXP
     end
 
-    subgraph HOOKER["Хукинг - Хук функций"]
+    subgraph HPT["HPT Orchestrator"]
         direction TB
-        HK_ART["ART Hook\n(Albatross)"]
-        HK_INL["Inline Hook\n(android-inline-hook)"]
-        HK_PLT["PLT/GOT Hook\n(Bhook)"]
-        HK_TLS["Безследный Hook\n(Vector)"]
+        HK_MOD["Подсистема хукинга\n(IHookBackend)"]
+        ME_MOD["Подсистема редактирования памяти\n(IMemoryEditor)"]
+        HK_MOD --> HK_ART["ART Hook\n(Albatross)"]
+        HK_MOD --> HK_INL["Inline Hook\n(android-inline-hook)"]
+        HK_MOD --> HK_PLT["PLT/GOT Hook\n(Bhook)"]
+        HK_MOD --> HK_TLS["Безследный Hook\n(Vector)"]
         HK_ART --> HK_MEM["Патчинг памяти\n(KittyMemory)"]
         HK_INL --> HK_MEM
         HK_PLT --> HK_MEM
         HK_TLS --> HK_MEM
+        ME_MOD --> ME_KIT["KittyMemory"]
+        ME_MOD --> ME_KITX["KittyMemoryEx"]
     end
 
     subgraph RUNTIME["Рантайм - Активное устройство"]
@@ -190,11 +202,19 @@ flowchart TB
         R_MIO["MemoryIO"]
         R_SYM["SymbolResolver\n(xdl)"]
         R_ZZ["ZigZag\n(Скрытность/Обход)"]
+        R_HPT["HPTManager\n(Жизненный цикл)"]
         R_FS["FreedomService\n(KernelSU, SUI, SukiSU)"]
         R_BRG --> R_PM
         R_PM --> R_MIO
         R_PM --> R_SYM
         R_ZZ --> R_FS
+        R_HPT --> HK_MOD
+        R_HPT --> ME_MOD
+    end
+
+    subgraph TASKFLOW["Taskflow - Параллельное планирование"]
+        direction TB
+        TF["TaskflowAdapter\n(FetchContent v3.8.0)"]
     end
 
     subgraph OUTPUT["Выход"]
@@ -218,6 +238,8 @@ flowchart TB
     HK_MEM --> O_PT
     R_MIO --> HK_MEM
     R_SYM --> D_RES
+    TF --> HK_MOD
+    TF --> ME_MOD
 ```
 
 ## Архитектура модулей
@@ -225,15 +247,22 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph CORE["Базовый слой"]
-        COMMON["common/\n(Math, Serialization)"]
+        COMMON["common/\n(Math, Json, Taskflow)"]
         TOOLCHAIN["toolchain/\n(Rizin, Headers)"]
     end
 
     subgraph NATIVE["Нативный слой (C++17)"]
         HYDRA["Hydra / Hydra2D\nСтатический анализ"]
-        DUMPER["Dumper\nБинарный дамп"]
-        HOOKER["Hooker\nХуккинг функций"]
+        DUMPER["Universal Dumper\nНативный дамп Android"]
+        HPT["HPT Orchestrator\nХукинг + MemoryEditing"]
         RUNTIME["Runtime\nАктивное устройство"]
+    end
+
+    subgraph HOOKS["Бэкенды хукинга"]
+        HK_ART["Albatross\n(ART Hook)"]
+        HK_BHK["Bhook\n(PLT/GOT)"]
+        HK_VEC["Vector\n(Traceless)"]
+        HK_KIT["KittyMemory\n(Патчинг памяти)"]
     end
 
     subgraph UI["UI слой (Kotlin)"]
@@ -242,17 +271,21 @@ flowchart LR
 
     CORE --> HYDRA
     CORE --> DUMPER
-    CORE --> HOOKER
+    CORE --> HPT
     CORE --> RUNTIME
     TOOLCHAIN --> HYDRA
 
     HYDRA --> DUMPER
     RUNTIME --> DUMPER
-    RUNTIME --> HOOKER
+    RUNTIME --> HPT
+    HPT --> HK_ART
+    HPT --> HK_BHK
+    HPT --> HK_VEC
+    HPT --> HK_KIT
 
     HYDRA -.-> APP
     DUMPER -.-> APP
-    HOOKER -.-> APP
+    HPT -.-> APP
     RUNTIME -.-> APP
 ```
 
@@ -267,14 +300,15 @@ cd OmniByte
 ./gradlew assembleDebug
 
 # Или сборка только нативного кода
-cd app/src/main/cpp
-mkdir build && cd build
-cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
-      -DANDROID_ABI=arm64-v8a \
-      -DANDROID_PLATFORM=android-23 \
-      ..
-make
+./scripts/build-native.sh
+
+# Сборка с определёнными опциями
+./scripts/build-native.sh --abi arm64-v8a --api 23
+./scripts/build-native.sh --abi armeabi-v7a --api 21
+./scripts/build-native.sh --clean
 ```
+
+> **Примечание:** Нативная сборка требует Android SDK и NDK. Запустите `./scripts/build-native.sh --help` для всех опций.
 
 ## Лицензия
 
