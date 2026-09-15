@@ -40,9 +40,11 @@ OmniByte — это инструментарий обратного инжене
 | 📊 **Анализ бинарников** | Статический анализ бинарников (ELF/PE) с дизассемблером и декомпилятором |
 | 🔧 **Редактор бинарников** | Прямое редактирование бинарников с hex-редактором и патчингом |
 | 📦 **Universal Dumper** | Дамп универсальных нативных библиотек Android (все движки: Unity, Unreal, Godot и т.д.) вручную или автоматически во время Live PID |
-| 🪝 **Хукинг** | Хук нативных функций и методов ART с 4 бэкендами (Albatross, Bhook, Vector, KittyMemory) |
+| 🪝 **Хукинг** | Хук нативных функций и методов ART с 6 бэкендами (Albatross, Bhook, Vector, KittyMemory, SQLhook, NPhook) |
 | 🧠 **Редактор памяти** | Чтение и запись памяти активных процессов через KittyMemory/KittyMemoryEx |
-| 🌐 **Мониторинг, захват и редактирование сети** | Мониторинг, захват и редактирование сетевых пакетов в реальном времени |
+| 🗄️ **Database Hooking** | Хук функций SQLite (sqlite3_exec, sqlite3_prepare_v2 и т.д.) через SQLhook |
+| 🌐 **Network Hooking** | Хук сетевых функций libc (send, recv, connect, socket) через NPhook (dlsym + inline hook) |
+| 📡 **Мониторинг, захват и редактирование сети** | Мониторинг, захват и редактирование сетевых пакетов в реальном времени |
 
 ## Поддержка платформы
 
@@ -117,6 +119,12 @@ OmniByte/
 │   │       └── Vector/           # Безследный бэкенд
 │   └── HPT/                      # Модуль HPT Orchestrator
 │       ├── Hooker/               # Подсистема хукинга (IHookBackend)
+│       │   ├── Albatross/        # ART method hook (pls/plthook + shadowhook)
+│       │   ├── Bhook/            # PLT/GOT hook (PLTHook + shadowhook)
+│       │   ├── Inlinehook/       # Inline hook (shadowhook)
+│       │   ├── Vectorhook/       # Traceless hook (pltinline)
+│       │   ├── SQLhook/          # Database hook (sqlite3 hooking)
+│       │   └── NPhook/           # Network packet hook (dlsym + shadowhook)
 │       └── MemoryEditor/         # Подсистема редактирования памяти (IMemoryEditor)
 ├── runtime/                      # Рантайм активного устройства
 │   ├── Bridges/                  # Загрузчики мостов
@@ -146,6 +154,9 @@ OmniByte/
 ```
 
 ## Рабочий пайплайн
+
+<details open>
+<summary><strong>Рабочий пайплайн (нажмите чтобы скрыть/показать)</strong></summary>
 
 ```mermaid
 flowchart TB
@@ -187,10 +198,14 @@ flowchart TB
         HK_MOD --> HK_INL["Inline Hook\n(android-inline-hook)"]
         HK_MOD --> HK_PLT["PLT/GOT Hook\n(Bhook)"]
         HK_MOD --> HK_TLS["Безследный Hook\n(Vector)"]
+        HK_MOD --> HK_DB["Database Hook\n(SQLhook)"]
+        HK_MOD --> HK_NP["Network Hook\n(NPhook)"]
         HK_ART --> HK_MEM["Патчинг памяти\n(KittyMemory)"]
         HK_INL --> HK_MEM
         HK_PLT --> HK_MEM
         HK_TLS --> HK_MEM
+        HK_DB --> HK_MEM
+        HK_NP --> HK_MEM
         ME_MOD --> ME_KIT["KittyMemory"]
         ME_MOD --> ME_KITX["KittyMemoryEx"]
     end
@@ -242,7 +257,12 @@ flowchart TB
     TF --> ME_MOD
 ```
 
+</details>
+
 ## Архитектура модулей
+
+<details open>
+<summary><strong>Архитектура модулей (нажмите чтобы скрыть/показать)</strong></summary>
 
 ```mermaid
 flowchart LR
@@ -263,6 +283,8 @@ flowchart LR
         HK_BHK["Bhook\n(PLT/GOT)"]
         HK_VEC["Vector\n(Traceless)"]
         HK_KIT["KittyMemory\n(Патчинг памяти)"]
+        HK_SQL["SQLhook\n(Database Hook)"]
+        HK_NP["NPhook\n(Network Hook)"]
     end
 
     subgraph UI["UI слой (Kotlin)"]
@@ -282,12 +304,16 @@ flowchart LR
     HPT --> HK_BHK
     HPT --> HK_VEC
     HPT --> HK_KIT
+    HPT --> HK_SQL
+    HPT --> HK_NP
 
     HYDRA -.-> APP
     DUMPER -.-> APP
     HPT -.-> APP
     RUNTIME -.-> APP
 ```
+
+</details>
 
 ## Сборка
 

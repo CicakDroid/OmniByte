@@ -40,9 +40,11 @@ OmniByte 是一个基于 **Kotlin + C++ Native** 构建的 Android 逆向工程�
 | 📊 **二进制分析** | 静态二进制分析（ELF/PE），包含反汇编器和反编译器 |
 | 🔧 **二进制编辑器** | 直接编辑二进制文件，支持十六进制编辑器和补丁 |
 | 📦 **Universal Dumper** | 转储 Android 通用原生库（所有引擎：Unity, Unreal, Godot 等），支持手动或 Live PID 自动转储 |
-| 🪝 **Hooking** | 使用 4 种后端（Albatross, Bhook, Vector, KittyMemory）Hook 原生函数和 ART 方法 |
+| 🪝 **Hooking** | 使用 6 种后端（Albatross, Bhook, Vector, KittyMemory, SQLhook, NPhook）Hook 原生函数和 ART 方法 |
 | 🧠 **内存编辑器** | 通过 KittyMemory/KittyMemoryEx 读写活动进程内存 |
-| 🌐 **网络监控、捕获与编辑** | 实时监控、捕获和编辑网络数据包 |
+| 🗄️ **Database Hooking** | Hook SQLite 数据库函数（sqlite3_exec, sqlite3_prepare_v2 等）via SQLhook |
+| 🌐 **Network Hooking** | Hook libc 网络函数（send, recv, connect, socket）via NPhook（dlsym + inline hook） |
+| 📡 **网络监控、捕获与编辑** | 实时监控、捕获和编辑网络数据包 |
 
 ## 平台支持
 
@@ -117,6 +119,12 @@ OmniByte/
 │   │       └── Vector/           # 无痕后端
 │   └── HPT/                      # HPT Orchestrator 模块
 │       ├── Hooker/               # Hooking 子系统 (IHookBackend)
+│       │   ├── Albatross/        # ART method hook (pls/plthook + shadowhook)
+│       │   ├── Bhook/            # PLT/GOT hook (PLTHook + shadowhook)
+│       │   ├── Inlinehook/       # Inline hook (shadowhook)
+│       │   ├── Vectorhook/       # Traceless hook (pltinline)
+│       │   ├── SQLhook/          # Database hook (sqlite3 hooking)
+│       │   └── NPhook/           # Network packet hook (dlsym + shadowhook)
 │       └── MemoryEditor/         # 内存编辑子系统 (IMemoryEditor)
 ├── runtime/                      # 活跃设备运行时
 │   ├── Bridges/                  # 桥接加载器
@@ -146,6 +154,9 @@ OmniByte/
 ```
 
 ## 工作流程
+
+<details open>
+<summary><strong>工作流程（点击隐藏/显示）</strong></summary>
 
 ```mermaid
 flowchart TB
@@ -187,10 +198,14 @@ flowchart TB
         HK_MOD --> HK_INL["Inline Hook\n(android-inline-hook)"]
         HK_MOD --> HK_PLT["PLT/GOT Hook\n(Bhook)"]
         HK_MOD --> HK_TLS["无痕 Hook\n(Vector)"]
+        HK_MOD --> HK_DB["Database Hook\n(SQLhook)"]
+        HK_MOD --> HK_NP["Network Hook\n(NPhook)"]
         HK_ART --> HK_MEM["内存补丁\n(KittyMemory)"]
         HK_INL --> HK_MEM
         HK_PLT --> HK_MEM
         HK_TLS --> HK_MEM
+        HK_DB --> HK_MEM
+        HK_NP --> HK_MEM
         ME_MOD --> ME_KIT["KittyMemory"]
         ME_MOD --> ME_KITX["KittyMemoryEx"]
     end
@@ -242,7 +257,12 @@ flowchart TB
     TF --> ME_MOD
 ```
 
+</details>
+
 ## 模块架构
+
+<details open>
+<summary><strong>模块架构（点击隐藏/显示）</strong></summary>
 
 ```mermaid
 flowchart LR
@@ -263,6 +283,8 @@ flowchart LR
         HK_BHK["Bhook\n(PLT/GOT)"]
         HK_VEC["Vector\n(Traceless)"]
         HK_KIT["KittyMemory\n(内存补丁)"]
+        HK_SQL["SQLhook\n(Database Hook)"]
+        HK_NP["NPhook\n(Network Hook)"]
     end
 
     subgraph UI["UI 层 (Kotlin)"]
@@ -282,12 +304,16 @@ flowchart LR
     HPT --> HK_BHK
     HPT --> HK_VEC
     HPT --> HK_KIT
+    HPT --> HK_SQL
+    HPT --> HK_NP
 
     HYDRA -.-> APP
     DUMPER -.-> APP
     HPT -.-> APP
     RUNTIME -.-> APP
 ```
+
+</details>
 
 ## 构建
 

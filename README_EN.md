@@ -40,9 +40,11 @@ The toolkit is designed for static & dynamic analysis, decompilation, binary edi
 | 📊 **Binary Analysis** | Static binary analysis (ELF/PE) with disassembler & decompiler |
 | 🔧 **Binary Editor** | Direct binary editing with hex editor & patching |
 | 📦 **Universal Dumper** | Dump universal Android native library (all engines: Unity, Unreal, Godot, etc.) manually or automatically during Live PID |
-| 🪝 **Hooking** | Hook native functions & ART methods with 4 backends (Albatross, Bhook, Vector, KittyMemory) |
+| 🪝 **Hooking** | Hook native functions & ART methods with 6 backends (Albatross, Bhook, Vector, KittyMemory, SQLhook, NPhook) |
 | 🧠 **Memory Editor** | Read & write live process memory via KittyMemory/KittyMemoryEx |
-| 🌐 **Network Monitoring, Capture & Editing** | Monitor, capture, and edit network packets in real-time |
+| 🗄️ **Database Hooking** | Hook SQLite database functions (sqlite3_exec, sqlite3_prepare_v2, etc.) via SQLhook |
+| 🌐 **Network Hooking** | Hook libc network functions (send, recv, connect, socket) via NPhook (dlsym + inline hook) |
+| 📡 **Network Monitoring, Capture & Editing** | Monitor, capture, and edit network packets in real-time |
 
 ## Platform Support
 
@@ -117,6 +119,12 @@ OmniByte/
 │   │       └── Vector/           # Traceless backend
 │   └── HPT/                      # HPT Orchestrator Module
 │       ├── Hooker/               # Hooking subsystem (IHookBackend)
+│       │   ├── Albatross/        # ART method hook (pls/plthook + shadowhook)
+│       │   ├── Bhook/            # PLT/GOT hook (PLTHook + shadowhook)
+│       │   ├── Inlinehook/       # Inline hook (shadowhook)
+│       │   ├── Vectorhook/       # Traceless hook (pltinline)
+│       │   ├── SQLhook/          # Database hook (sqlite3 hooking)
+│       │   └── NPhook/           # Network packet hook (dlsym + shadowhook)
 │       └── MemoryEditor/         # Memory editing subsystem (IMemoryEditor)
 ├── runtime/                      # Live Device Runtime
 │   ├── Bridges/                  # Bridge loaders
@@ -146,6 +154,9 @@ OmniByte/
 ```
 
 ## Working Pipeline
+
+<details open>
+<summary><strong>Working Pipeline (click to hide/unhide)</strong></summary>
 
 ```mermaid
 flowchart TB
@@ -187,10 +198,14 @@ flowchart TB
         HK_MOD --> HK_INL["Inline Hook\n(android-inline-hook)"]
         HK_MOD --> HK_PLT["PLT/GOT Hook\n(Bhook)"]
         HK_MOD --> HK_TLS["Traceless Hook\n(Vector)"]
+        HK_MOD --> HK_DB["Database Hook\n(SQLhook)"]
+        HK_MOD --> HK_NP["Network Hook\n(NPhook)"]
         HK_ART --> HK_MEM["Memory Patching\n(KittyMemory)"]
         HK_INL --> HK_MEM
         HK_PLT --> HK_MEM
         HK_TLS --> HK_MEM
+        HK_DB --> HK_MEM
+        HK_NP --> HK_MEM
         ME_MOD --> ME_KIT["KittyMemory"]
         ME_MOD --> ME_KITX["KittyMemoryEx"]
     end
@@ -242,7 +257,12 @@ flowchart TB
     TF --> ME_MOD
 ```
 
+</details>
+
 ## Module Architecture
+
+<details open>
+<summary><strong>Module Architecture (click to hide/unhide)</strong></summary>
 
 ```mermaid
 flowchart LR
@@ -263,6 +283,8 @@ flowchart LR
         HK_BHK["Bhook\n(PLT/GOT)"]
         HK_VEC["Vector\n(Traceless)"]
         HK_KIT["KittyMemory\n(Memory Patching)"]
+        HK_SQL["SQLhook\n(Database Hook)"]
+        HK_NP["NPhook\n(Network Hook)"]
     end
 
     subgraph UI["UI Layer (Kotlin)"]
@@ -282,12 +304,16 @@ flowchart LR
     HPT --> HK_BHK
     HPT --> HK_VEC
     HPT --> HK_KIT
+    HPT --> HK_SQL
+    HPT --> HK_NP
 
     HYDRA -.-> APP
     DUMPER -.-> APP
     HPT -.-> APP
     RUNTIME -.-> APP
 ```
+
+</details>
 
 ## Build
 
