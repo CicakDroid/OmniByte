@@ -24,6 +24,10 @@ bool ApkSignatureBypass::initialize() {
     // Initialize both adapters in parallel (each fetches upstream version).
     bool killerOk = killer_.initialize();
     bool killerExOk = killerEx_.initialize();
+    extractor_.initialize();
+    injector_.initialize();
+    spoofer_.initialize();
+    nativePms_.initialize();
 
     if (!killerOk && !killerExOk) {
         reportProgress(100, "Both adapters failed to initialize");
@@ -43,6 +47,8 @@ bool ApkSignatureBypass::initialize() {
 void ApkSignatureBypass::shutdown() {
     killer_.removeHook();
     killerEx_.removeHook();
+    nativePms_.unhook();
+    spoofer_.restore();
     initialized_ = false;
 }
 
@@ -94,6 +100,26 @@ BypassResult ApkSignatureBypass::bypassPackage(const std::string& packageName,
             }
             break;
 
+        case BypassStrategy::LoadedApkSpoof:
+            if (spoofer_.initialize() && spoofer_.spoof(packageName, signatureData)) {
+                result.success = true;
+                result.method = "LoadedApkSpoofer";
+                result.message = "LoadedApk spoof active";
+            } else {
+                result.message = "LoadedApk spoof failed";
+            }
+            break;
+
+        case BypassStrategy::NativePmsHook:
+            if (nativePms_.initialize() && nativePms_.hook()) {
+                result.success = true;
+                result.method = "NativePmsHook";
+                result.message = "Native PMS inline hook installed";
+            } else {
+                result.message = "Native PMS hook failed";
+            }
+            break;
+
         case BypassStrategy::Auto:
         default:
             result.message = "Auto strategy should have been resolved";
@@ -106,7 +132,9 @@ BypassResult ApkSignatureBypass::bypassPackage(const std::string& packageName,
 bool ApkSignatureBypass::removeAllHooks() {
     bool a = killer_.removeHook();
     bool b = killerEx_.removeHook();
-    return a && b;
+    bool c = nativePms_.unhook();
+    spoofer_.restore();
+    return a && b && c;
 }
 
 // --- Offline Bypass ---
@@ -158,6 +186,72 @@ BypassResult ApkSignatureBypass::injectApk(const std::string& srcApk,
             break;
     }
 
+    return result;
+}
+
+// --- Signature Clone ---
+
+BypassResult ApkSignatureBypass::cloneAndInject(const std::string& origApk,
+                                                const std::string& modApk,
+                                                const std::string& outApk) {
+    BypassResult result;
+    if (!initialized_) {
+        result.message = "Not initialized";
+        return result;
+    }
+
+    auto sigs = extractor_.extractAll(origApk);
+    if (sigs.empty()) {
+        result.message = "No signatures extracted from original APK";
+        return result;
+    }
+
+    if (injector_.cloneSignatures(sigs, modApk, outApk)) {
+        result.success = true;
+        result.method = "SignatureClone";
+        result.message = "Cloned " + std::to_string(sigs.size()) + " signatures";
+    } else {
+        result.message = "Signature injection failed";
+    }
+    return result;
+}
+
+// --- LoadedApk Spoof ---
+
+BypassResult ApkSignatureBypass::spoofLoadedApk(const std::string& packageName,
+                                                const std::string& signatureData) {
+    BypassResult result;
+    if (!initialized_) {
+        result.message = "Not initialized";
+        return result;
+    }
+
+    if (spoofer_.initialize() && spoofer_.spoof(packageName, signatureData)) {
+        result.success = true;
+        result.method = "LoadedApkSpoofer";
+        result.message = "LoadedApk spoof active";
+    } else {
+        result.message = "LoadedApk spoof failed";
+    }
+    return result;
+}
+
+// --- Native PMS Hook ---
+
+BypassResult ApkSignatureBypass::hookNativePms() {
+    BypassResult result;
+    if (!initialized_) {
+        result.message = "Not initialized";
+        return result;
+    }
+
+    if (nativePms_.initialize() && nativePms_.hook()) {
+        result.success = true;
+        result.method = "NativePmsHook";
+        result.message = "Native PMS inline hook installed";
+    } else {
+        result.message = "Native PMS hook failed";
+    }
     return result;
 }
 

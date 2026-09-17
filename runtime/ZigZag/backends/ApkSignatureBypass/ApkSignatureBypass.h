@@ -11,6 +11,10 @@
 
 #include "ApkSigKiller/ApkSigKillerAdapter.h"
 #include "ApkSigKillerEx/ApkSigKillerAdapter.h"
+#include "SignatureExtractor.h"
+#include "SignatureInjector.h"
+#include "LoadedApkSpoofer.h"
+#include "NativePmsHook.h"
 #include <string>
 #include <functional>
 #include <memory>
@@ -23,6 +27,9 @@ enum class BypassStrategy {
     V1Only,         // ApkSigKiller only (JAR signatures, Android 4.x+).
     V1PlusV2V3,     // ApkSigKillerEx (full bypass, Android 9+).
     Both,           // Install both hooks for maximum coverage.
+    Clone,          // Extract from original, inject into modified.
+    LoadedApkSpoof, // Runtime LoadedApk hook.
+    NativePmsHook,  // Native inline hook for PMS.
 };
 
 /// Result of a bypass operation.
@@ -69,6 +76,26 @@ public:
                            const std::string& outApk,
                            BypassStrategy strategy = BypassStrategy::Auto);
 
+    /// Clone signatures from original APK and inject into modified APK.
+    /// @param origApk  Path to original signed APK.
+    /// @param modApk   Path to modified APK.
+    /// @param outApk   Path to write patched APK with cloned signatures.
+    /// @return BypassResult.
+    BypassResult cloneAndInject(const std::string& origApk,
+                                const std::string& modApk,
+                                const std::string& outApk);
+
+    /// Runtime spoof via LoadedApk hook.
+    /// @param packageName    Target package name.
+    /// @param signatureData  Base64-encoded original APK signatures.
+    /// @return BypassResult.
+    BypassResult spoofLoadedApk(const std::string& packageName,
+                                const std::string& signatureData);
+
+    /// Native inline hook for Package Manager Service.
+    /// @return BypassResult.
+    BypassResult hookNativePms();
+
     // --- Version Management ---
     /// Check if updates are available for either adapter.
     struct UpdateInfo {
@@ -100,6 +127,10 @@ private:
     bool initialized_ = false;
     ApkSigKillerAdapter killer_;
     ApkSigKillerExAdapter killerEx_;
+    SignatureExtractor extractor_;
+    SignatureInjector injector_;
+    LoadedApkSpoofer spoofer_;
+    NativePmsHook nativePms_;
     std::function<void(int, const std::string&)> progressCb_;
 
     /// Auto-detect best strategy based on Android API level.
