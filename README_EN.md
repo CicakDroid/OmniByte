@@ -65,7 +65,7 @@ OmniByte/
 │       ├── java/com/omnibyte/    # Kotlin source
 │       ├── cpp/                  # Native aggregator (CMake)
 │       └── res/                  # Android resources
-├── Hydra/                        # Static Analysis Engine
+├── Hydra/                        # Static & Dynamic Analysis Engine
 │   ├── Hydra2D/                  # Core analysis engine
 │   │   ├── Disassembler/         # Binary disassembly
 │   │   ├── Decompiler/           # Code decompilation
