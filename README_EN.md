@@ -37,9 +37,9 @@ The toolkit is designed for static & dynamic analysis, decompilation, binary edi
 |---------|-------------|
 | 🔍 **APK Decompiler** | Decompile APK to source code (Java/Smali/DEX) with multi-engine support |
 | ✏️ **APK Editor** | Edit manifest, resources, smali, and rebuild APK |
-| 📊 **Binary Analysis** | Static binary analysis (ELF/PE) with disassembler & decompiler |
+| 📊 **Binary Analysis** | Static & Dynamic binary analysis (ELF/PE) with disassembler & decompiler |
 | 🔧 **Binary Editor** | Direct binary editing with hex editor & patching |
-| 📦 **Universal Dumper** | Dump universal Android native library (all engines: Unity, Unreal, Godot, etc.) manually or automatically during Live PID |
+| 📦 **Universal Dumper** | Dump universal Android native library manually or automatically during Live PID (Bonus: 7 games engines: Unity, Unreal, Godot, etc.) |
 | 🪝 **Hooking** | Hook native functions & ART methods with 6 backends (Albatross, Bhook, Vector, KittyMemory, SQLhook, NPhook) |
 | 🧠 **Memory Editor** | Read & write live process memory via KittyMemory/KittyMemoryEx |
 | 🗄️ **Database Hooking** | Hook SQLite database functions (sqlite3_exec, sqlite3_prepare_v2, etc.) via SQLhook |
