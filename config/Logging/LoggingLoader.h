@@ -2,7 +2,7 @@
 // Logging/LoggingLoader.h — load LoggingConfig from JSON.
 
 #include "LoggingConfig.h"
-#include <common/Serialization/JsonLoader.h>
+#include <common/Deserialization-Serialization/Json/Json.h>
 
 namespace omnibyte::dumper::config {
 

@@ -2,7 +2,7 @@
 // Runtime/RuntimeLoader.h — load RuntimeConfig from JSON.
 
 #include "RuntimeConfig.h"
-#include <common/Serialization/JsonLoader.h>
+#include <common/Deserialization-Serialization/Json/Json.h>
 
 namespace omnibyte::dumper::config {
 

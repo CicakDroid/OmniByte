@@ -4,7 +4,7 @@
 #include <optional>
 #include <string>
 #include <nlohmann/json.hpp>
-#include <common/Serialization/JsonLoader.h>
+#include <common/Deserialization-Serialization/Json/Json.h>
 
 namespace omnibyte::dumper::config {
 

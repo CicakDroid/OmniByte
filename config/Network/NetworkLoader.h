@@ -2,7 +2,7 @@
 // Network/NetworkLoader.h — load NetworkConfig from JSON.
 
 #include "NetworkConfig.h"
-#include <common/Serialization/JsonLoader.h>
+#include <common/Deserialization-Serialization/Json/Json.h>
 
 namespace omnibyte::dumper::config {
 

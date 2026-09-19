@@ -1,7 +1,7 @@
 // config/ConfigManager.cpp — central config loader implementation.
 
 #include "ConfigManager.h"
-#include <common/Serialization/JsonLoader.h>
+#include <common/Deserialization-Serialization/Json/Json.h>
 #include <fstream>
 #include <iostream>
 #include <filesystem>

@@ -2,7 +2,7 @@
 // UI/UILoader.h — load UIConfig from JSON.
 
 #include "UIConfig.h"
-#include <common/Serialization/JsonLoader.h>
+#include <common/Deserialization-Serialization/Json/Json.h>
 
 namespace omnibyte::dumper::config {
 

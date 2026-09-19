@@ -2,7 +2,7 @@
 // FileLimits/FileLimitsLoader.h — load FileLimitsConfig from JSON.
 
 #include "FileLimitsConfig.h"
-#include <common/Serialization/JsonLoader.h>
+#include <common/Deserialization-Serialization/Json/Json.h>
 
 namespace omnibyte::dumper::config {
 

@@ -8,8 +8,8 @@ project(dumper_config LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# --- nlohmann/json via omnibyte_serialization (single-source-of-truth) ---
-include(${CMAKE_CURRENT_SOURCE_DIR}/../common/Serialization/CMakeLists.txt)
+# --- nlohmann/json via omnibyte_json (single-source-of-truth) ---
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/Deserialization-Serialization/Json/CMakeLists.txt)
 
 add_library(dumper_config STATIC
     ConfigManager.cpp
@@ -18,4 +18,4 @@ target_include_directories(dumper_config PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../common
 )
-target_link_libraries(dumper_config PUBLIC omnibyte_serialization)
+target_link_libraries(dumper_config PUBLIC omnibyte_json)

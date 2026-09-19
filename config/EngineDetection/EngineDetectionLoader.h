@@ -2,7 +2,7 @@
 // EngineDetection/EngineDetectionLoader.h — load EngineDetectionConfig from JSON.
 
 #include "EngineDetectionConfig.h"
-#include <common/Serialization/JsonLoader.h>
+#include <common/Deserialization-Serialization/Json/Json.h>
 
 namespace omnibyte::dumper::config {
 

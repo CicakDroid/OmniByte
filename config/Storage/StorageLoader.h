@@ -2,7 +2,7 @@
 // Storage/StorageLoader.h — load StorageConfig from JSON.
 
 #include "StorageConfig.h"
-#include <common/Serialization/JsonLoader.h>
+#include <common/Deserialization-Serialization/Json/Json.h>
 
 namespace omnibyte::dumper::config {
 
