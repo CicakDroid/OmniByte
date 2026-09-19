@@ -1,22 +1,14 @@
 #pragma once
-// ── Profiles/CocosCreatorV2Profile.h ───────────────────────────────
 // Cocos Creator v2.x profile (2.0 — 2.4, released 2018–2023).
-// Based on Cocos2d-x runtime
-// Scripting: JavaScript, TypeScript
-// Editor: Cocos Creator editor (mature)
-// Architecture: Entity-Component system
-// Libraries: libcocos2d.so, libjsc.so
-// New in v2: Asset Manager (replaces old ResourceLoader), improved TypeScript
-// Detection signals:
-//   - cc.Node, cc.Label, cc.Component, cc.director, cc.game
-//   - libcocos2d.so, libjsc.so
-//   - .fire scene files (v2 format), .meta files
-//   - cocos2d.js in assets/
-//   - settings/ directory with editor version
+// Sub-version detection:
+//   v2.0: Initial release, Asset Manager
+//   v2.1: Improved TypeScript support
+//   v2.4: Final v2 release
 #include "../../../DumperCore/IEngineProfile.h"
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <optional>
 
 namespace omnibyte::dumper::cocos2d {
 
@@ -26,30 +18,48 @@ public:
 
     uint64_t offsetOf(const std::string& key) const override {
         (void)key;
-        return 0; // Cocos Creator v2: no fixed offsets, use symbolFor() instead
+        return 0;
     }
 
     size_t structSize(const std::string& key) const override {
         (void)key;
-        return 0; // Cocos Creator v2: no fixed struct sizes, use symbolFor() instead
+        return 0;
     }
 
     std::optional<std::string> symbolFor(const std::string& key) const override {
-        // v2 uses Cocos Creator native symbols (cc namespace)
         if (key == "cc::Director::getInstance")      return "cc::Director::getInstance";
         if (key == "cc::AssetManager::getInstance")  return "cc::AssetManager::getInstance";
         if (key == "cc::Game::getInstance")          return "cc::Game::getInstance";
         if (key == "cc::SysInfo::getVersion")        return "cc::SysInfo::getVersion";
+        if (key == "cc::resources::load")            return "cc::resources::load";
         if (key == "v8::Isolate::GetCurrent")        return "v8::Isolate::GetCurrent";
         if (key == "FileUtils::getInstance")         return "FileUtils::getInstance";
+        if (key == "FileUtils::fullPathForFilename") return "FileUtils::fullPathForFilename";
         return std::nullopt;
     }
 
     bool validate(const uint8_t* headerBytes, size_t len) const override {
-        // Validate by checking for Cocos Creator v2 signals
         (void)headerBytes;
         (void)len;
         return true;
+    }
+
+    // v2.1+ has improved Asset Manager
+    std::string detectSubVersion(const uint8_t* data, size_t len) const override {
+        std::string subVersion = "2.0";
+
+        bool hasAssetManager = false;
+        for (size_t i = 0; i + 15 < len; ++i) {
+            std::string chunk(reinterpret_cast<const char*>(data + i), 15);
+            if (chunk.find("AssetManager") != std::string::npos) {
+                hasAssetManager = true;
+                break;
+            }
+        }
+
+        if (hasAssetManager) subVersion = "2.1";
+
+        return subVersion;
     }
 };
 

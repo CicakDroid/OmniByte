@@ -1,22 +1,16 @@
 #pragma once
-// Profiles/CocosCreatorV3Profile.h
 // Cocos Creator v3.x profile (3.0 - 3.8, released 2021-present).
-// COMPLETELY REWRITTEN - no longer based on Cocos2d-x.
-// New high-performance cross-platform 3D core.
-// Scripting: JavaScript, TypeScript
-// Editor: Cocos Creator editor (3.x)
-// Libraries: libcocos.so (renamed from libcocos2d.so), libjsc.so
-// Changes from v2: 3D core, new rendering pipeline, ECS architecture
-//   API differences from v2: significantly different, not fully compatible
-// Detection signals:
-//   - cc.Node, cc.Label, cc.Component, cc.MeshRenderer
-//   - libcocos.so (NOT libcocos2d.so)
-//   - .scene files (new format), .meta files
-//   - settings/ directory with editor version
+// Sub-version detection:
+//   v3.0: Initial release, new 3D core
+//   v3.5: Built project upgrade guide
+//   v3.6: New build template format, settings.json
+//   v3.7: XR support, Procedural Animation
+//   v3.8: Custom Render Pipeline, High Precision Text
 #include "../../../DumperCore/IEngineProfile.h"
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <optional>
 
 namespace omnibyte::dumper::cocos2d {
 
@@ -26,31 +20,56 @@ public:
 
     uint64_t offsetOf(const std::string& key) const override {
         (void)key;
-        return 0; // Cocos Creator v3: no fixed offsets, use symbolFor() instead
+        return 0;
     }
 
     size_t structSize(const std::string& key) const override {
         (void)key;
-        return 0; // Cocos Creator v3: no fixed struct sizes, use symbolFor() instead
+        return 0;
     }
 
     std::optional<std::string> symbolFor(const std::string& key) const override {
-        // v3 uses new Cocos engine symbols (cc namespace, libcocos.so)
         if (key == "cc::Director::getInstance")      return "cc::Director::getInstance";
         if (key == "cc::AssetManager::getInstance")  return "cc::AssetManager::getInstance";
         if (key == "cc::Game::getInstance")          return "cc::Game::getInstance";
         if (key == "cc::SysInfo::getVersion")        return "cc::SysInfo::getVersion";
+        if (key == "cc::Scene::load")                return "cc::Scene::load";
+        if (key == "cc::resources::load")            return "cc::resources::load";
+        if (key == "cc::input::Input::on")           return "cc::input::Input::on";
         if (key == "v8::Isolate::GetCurrent")        return "v8::Isolate::GetCurrent";
-        // v3: FileUtils moved to different namespace in rewritten engine
         if (key == "FileUtils::getInstance")         return "FileUtils::getInstance";
         return std::nullopt;
     }
 
     bool validate(const uint8_t* headerBytes, size_t len) const override {
-        // Validate by checking for Cocos Creator v3 signals (libcocos.so, not libcocos2d.so)
         (void)headerBytes;
         (void)len;
         return true;
+    }
+
+    // Detect specific sub-version based on symbol presence
+    std::string detectSubVersion(const uint8_t* data, size_t len) const override {
+        std::string subVersion = "3.0";
+
+        bool hasXRSupport = false;
+        bool hasCustomPipeline = false;
+
+        for (size_t i = 0; i + 15 < len; ++i) {
+            std::string chunk(reinterpret_cast<const char*>(data + i), 15);
+            if (chunk.find("XRSession") != std::string::npos ||
+                chunk.find("XRReferenceSpace") != std::string::npos) {
+                hasXRSupport = true;
+            }
+            if (chunk.find("RenderPipeline") != std::string::npos) {
+                hasCustomPipeline = true;
+            }
+        }
+
+        if (hasCustomPipeline) subVersion = "3.8";
+        else if (hasXRSupport) subVersion = "3.7";
+        else subVersion = "3.5";
+
+        return subVersion;
     }
 };
 

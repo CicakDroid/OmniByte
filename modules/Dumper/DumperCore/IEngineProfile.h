@@ -97,6 +97,15 @@ public:
     // Dipakai sebagai validasi kedua setelah deteksi versi dari signature awal --
     // mencegah false-positive kalau nomor versi terdeteksi salah/di-strip.
     virtual bool validate(const uint8_t* headerBytes, size_t len) const = 0;
+
+    // Sub-version detection: detect specific sub-version from binary data.
+    // Default returns empty string (no sub-version detection).
+    // Override in profiles that need sub-version granularity (e.g., Cocos2d-x v3.15 vs v3.17).
+    virtual std::string detectSubVersion(const uint8_t* data, size_t len) const {
+        (void)data;
+        (void)len;
+        return "";
+    }
 };
 
 } // namespace omnibyte::dumper

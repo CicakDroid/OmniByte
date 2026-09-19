@@ -1,21 +1,14 @@
 #pragma once
-// ── Profiles/CocosCreatorV1Profile.h ───────────────────────────────
 // Cocos Creator v1.x profile (1.0 — 1.10, released 2017–2018).
-// Based on Cocos2d-x runtime underneath
-// Scripting: JavaScript (TypeScript support added in later 1.x)
-// Editor: Cocos Creator editor (early version)
-// Architecture: Entity-Component system
-// Libraries: libcocos2d.so, libjsc.so
-// Detection signals:
-//   - cc.Node, cc.Label, cc.Component
-//   - libcocos2d.so, libjsc.so
-//   - .fire scene files (v1 format)
-//   - cocos2d.js in assets/
-//   - settings/ directory with editor version
+// Sub-version detection:
+//   v1.0: Initial release, based on Cocos2d-x runtime
+//   v1.5: TypeScript support added
+//   v1.10: Final v1 release
 #include "../../../DumperCore/IEngineProfile.h"
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <optional>
 
 namespace omnibyte::dumper::cocos2d {
 
@@ -25,30 +18,48 @@ public:
 
     uint64_t offsetOf(const std::string& key) const override {
         (void)key;
-        return 0; // Cocos Creator v1: no fixed offsets, use symbolFor() instead
+        return 0;
     }
 
     size_t structSize(const std::string& key) const override {
         (void)key;
-        return 0; // Cocos Creator v1: no fixed struct sizes, use symbolFor() instead
+        return 0;
     }
 
     std::optional<std::string> symbolFor(const std::string& key) const override {
-        // v1 uses Cocos2d-x runtime symbols (cc namespace in JS, cocos2d:: in native)
         if (key == "cc::Director::getInstance")      return "cc::Director::getInstance";
         if (key == "cc::AssetManager::getInstance")  return "cc::AssetManager::getInstance";
         if (key == "cc::Game::getInstance")          return "cc::Game::getInstance";
-        // v1 uses cocos2d-x runtime — no cc::SysInfo yet
+        if (key == "cc::SysInfo::getVersion")        return "cc::SysInfo::getVersion";
         if (key == "v8::Isolate::GetCurrent")        return "v8::Isolate::GetCurrent";
         if (key == "FileUtils::getInstance")         return "FileUtils::getInstance";
+        if (key == "FileUtils::fullPathForFilename") return "FileUtils::fullPathForFilename";
         return std::nullopt;
     }
 
     bool validate(const uint8_t* headerBytes, size_t len) const override {
-        // Validate by checking for Cocos Creator v1 signals
         (void)headerBytes;
         (void)len;
         return true;
+    }
+
+    // v1.5+ has TypeScript support symbols
+    std::string detectSubVersion(const uint8_t* data, size_t len) const override {
+        std::string subVersion = "1.0";
+
+        bool hasTypeScript = false;
+        for (size_t i = 0; i + 15 < len; ++i) {
+            std::string chunk(reinterpret_cast<const char*>(data + i), 15);
+            if (chunk.find("TypeScript") != std::string::npos ||
+                chunk.find("typescript") != std::string::npos) {
+                hasTypeScript = true;
+                break;
+            }
+        }
+
+        if (hasTypeScript) subVersion = "1.5";
+
+        return subVersion;
     }
 };
 
