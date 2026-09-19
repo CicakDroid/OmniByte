@@ -15,6 +15,7 @@ add_subdirectory(Hooker/HookEngines/InlineHook/Shadowhook)
 add_subdirectory(Hooker/HookEngines/TracelessHook/Vectorhook)
 add_subdirectory(Hooker/HookEngines/DatabaseHook/SQLhook)
 add_subdirectory(Hooker/HookEngines/NPHook/NetworkPackethook)
+add_subdirectory(Hooker/HookEngines/IoHook)
 add_subdirectory(MemoryEditor/KittyMemory)
 
 add_library(hpt STATIC
@@ -30,5 +31,6 @@ target_link_libraries(hpt
     PRIVATE dumper common log
     PUBLIC  albatross_adapter bhook_adapter shadowhook_adapter
             vectorhook_adapter sqlhook_adapter np_hook_adapter
+            io_hook_adapter
             kittymemory_adapter kittymemoryex_adapter
 )
