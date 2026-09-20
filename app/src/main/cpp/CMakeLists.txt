@@ -17,6 +17,12 @@ set(ANDROID_STL c++_shared)
 set(OMNIBYTE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../")
 
 # ---------------------------------------------------------------------------
+# Common libraries (header-only / static adapters)
+# ---------------------------------------------------------------------------
+add_subdirectory(${OMNIBYTE_ROOT}/common/GMP/GMPAdapter        gmp_adapter)
+add_subdirectory(${OMNIBYTE_ROOT}/common/Boost/BoostAdapter    boost_adapter)
+
+# ---------------------------------------------------------------------------
 # Native roots (each owns its own CMakeLists.txt)
 # ---------------------------------------------------------------------------
 add_subdirectory(${OMNIBYTE_ROOT}/engine-core engine-core)
