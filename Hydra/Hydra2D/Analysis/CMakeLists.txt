@@ -16,6 +16,12 @@ add_library(hydradis_analysis STATIC
     Packers.cpp
     Obfuscate.cpp
     Taint.cpp
+    Functions.cpp
+    Variables.cpp
+    Parameters.cpp
+    Types.cpp
+    Confidences.cpp
+    Strings.cpp
 )
 
 # Public headers

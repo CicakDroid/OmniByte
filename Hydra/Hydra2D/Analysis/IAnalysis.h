@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace omnibyte::hydradis {
@@ -86,6 +87,59 @@ struct TaintResult {
     size_t sinksFound = 0;            // taint sink count (write, exec, system)
     size_t propagationPaths = 0;      // source→sink paths
     std::vector<uint64_t> taintedAddresses; // addresses carrying tainted data
+};
+
+/// Results from function naming analysis.
+struct FunctionsResult {
+    bool success = false;
+    std::string errorMessage;
+    std::vector<uint64_t> functionAddresses; // discovered function addresses
+    size_t namedFunctions = 0;              // functions with assigned names
+    std::unordered_map<uint64_t, std::string> functionNames; // addr → suggested name
+};
+
+/// Results from variable naming analysis.
+struct VariablesResult {
+    bool success = false;
+    std::string errorMessage;
+    std::vector<uint64_t> variableAddresses; // detected variable stack offsets
+    size_t namedVariables = 0;              // variables with assigned names
+    std::unordered_map<uint64_t, std::string> variableNames; // offset → suggested name
+};
+
+/// Results from parameter naming analysis.
+struct ParametersResult {
+    bool success = false;
+    std::string errorMessage;
+    std::vector<uint64_t> parameterRegisters; // register indices used as params
+    size_t namedParameters = 0;              // parameters with assigned names
+    std::unordered_map<uint64_t, std::string> parameterNames; // register → suggested name
+};
+
+/// Results from type inference analysis.
+struct TypesResult {
+    bool success = false;
+    std::string errorMessage;
+    std::vector<uint64_t> typedAddresses;   // addresses with inferred types
+    size_t inferredTypes = 0;               // number of types inferred
+    std::unordered_map<uint64_t, std::string> typeMap; // addr → type name (e.g. "int", "void*")
+};
+
+/// Results from confidence scoring analysis.
+struct ConfidencesResult {
+    bool success = false;
+    std::string errorMessage;
+    double overallConfidence = 0.0;         // average confidence across all results
+    std::unordered_map<std::string, double> categoryConfidence; // category → confidence
+};
+
+/// Results from string classification analysis.
+struct StringsResult {
+    bool success = false;
+    std::string errorMessage;
+    std::vector<uint64_t> stringAddresses;  // addresses of classified strings
+    size_t classifiedStrings = 0;           // strings with assigned categories
+    std::unordered_map<uint64_t, std::string> stringClassifications; // addr → category
 };
 
 // ── Abstract interface ──────────────────────────────────────────────────
@@ -175,6 +229,46 @@ public:
         uint64_t /*entryAddress*/,
         const std::vector<uint8_t>& /*codeData*/,
         const std::vector<uint64_t>& /*taintSources*/
+    ) const { return {}; }
+
+    // ── Function naming — default stubs ──────────────────────────────
+
+    virtual FunctionsResult analyzeFunctions(
+        uint64_t /*entryAddress*/,
+        const std::vector<uint8_t>& /*codeData*/
+    ) const { return {}; }
+
+    // ── Variable naming — default stubs ──────────────────────────────
+
+    virtual VariablesResult analyzeVariables(
+        uint64_t /*entryAddress*/,
+        const std::vector<uint8_t>& /*codeData*/
+    ) const { return {}; }
+
+    // ── Parameter naming — default stubs ─────────────────────────────
+
+    virtual ParametersResult analyzeParameters(
+        uint64_t /*entryAddress*/,
+        const std::vector<uint8_t>& /*codeData*/
+    ) const { return {}; }
+
+    // ── Type inference — default stubs ───────────────────────────────
+
+    virtual TypesResult analyzeTypes(
+        uint64_t /*entryAddress*/,
+        const std::vector<uint8_t>& /*codeData*/
+    ) const { return {}; }
+
+    // ── Confidence scoring — default stubs ───────────────────────────
+
+    virtual ConfidencesResult analyzeConfidences(
+        const std::vector<uint8_t>& /*codeData*/
+    ) const { return {}; }
+
+    // ── String classification — default stubs ────────────────────────
+
+    virtual StringsResult analyzeStrings(
+        const uint8_t* /*data*/, size_t /*dataSize*/
     ) const { return {}; }
 };
 
