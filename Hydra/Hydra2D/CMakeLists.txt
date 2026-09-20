@@ -10,6 +10,7 @@ add_subdirectory(Disassembler)
 add_subdirectory(Decompiler)
 add_subdirectory(Parser)
 add_subdirectory(Plugin)
+add_subdirectory(Analysis)
 add_subdirectory(Factory)
 add_subdirectory(Orchestrator)
 
