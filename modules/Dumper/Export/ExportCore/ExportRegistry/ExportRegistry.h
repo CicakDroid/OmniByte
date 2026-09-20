@@ -78,6 +78,10 @@ public:
         return list;
     }
 
+    // Register all built-in exporters (csharp, json, header, dummydll).
+    // Call once at startup or before first export.
+    void registerDefaults();
+
 private:
     ExportRegistry() = default;
     std::unordered_map<std::string, std::shared_ptr<IExporter>> exporters_;

@@ -1,12 +1,16 @@
-// ExportCore/ExportRegistry — Registry singleton implementation.
 #include "ExportRegistry.h"
+#include "../../Writers/CSharpWriter/CSharpWriter.h"
+#include "../../Writers/JsonWriter/JsonWriter.h"
+#include "../../Writers/DummyDllWriter/DummyDllWriter.h"
+#include "../../Writers/HeaderWriter/HeaderWriter.h"
 
 namespace omnibyte::dumper::export_core {
 
-// Static registration of default exporters will be handled by the init function
-extern "C" int dumper_export_registry_init() {
-    // Registry is auto-initialized via static singleton
-    return 0;
+void ExportRegistry::registerDefaults() {
+    registerExporter("csharp",   std::make_shared<writers::CSharpWriter>());
+    registerExporter("json",     std::make_shared<writers::JsonWriter>());
+    registerExporter("dummydll", std::make_shared<writers::DummyDllWriter>());
+    registerExporter("header",   std::make_shared<writers::HeaderWriter>());
 }
 
 } // namespace omnibyte::dumper::export_core
