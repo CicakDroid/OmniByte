@@ -1,7 +1,7 @@
 #pragma once
 // BoostAdapter -- C++ adapter for Boost libraries.
 // Source: https://github.com/boostorg/boost (BSL-1.0)
-// Version: 1.83.0
+// Version: 1.92.0
 //
 // Provides version checking and header inclusion for Boost.
 // Only includes the subset of Boost we actually use:

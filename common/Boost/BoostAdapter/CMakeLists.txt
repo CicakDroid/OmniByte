@@ -1,6 +1,6 @@
 # common/Boost/BoostAdapter — Boost C++ libraries.
 # Source: https://github.com/boostorg/boost (BSL-1.0)
-# Version: 1.83.0
+# Version: 1.92.0
 #
 # Provides omnibyte_boost INTERFACE target with selected Boost headers.
 # Fetches Boost source for header-only libraries we use.
@@ -11,8 +11,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # --- Upstream version (bump when updating) ---
-set(BOOST_VERSION "1.83.0")
-set(BOOST_URL "https://github.com/boostorg/boost/releases/download/boost-1.83.0/boost-1.83.0-b2-nodocs.tar.gz")
+set(BOOST_VERSION "1.92.0")
+set(BOOST_URL "https://github.com/boostorg/boost/releases/download/boost-1.92.0/boost-1.92.0-b2-nodocs.tar.gz")
 
 # --- Fetch upstream ---
 include(FetchContent)
@@ -20,7 +20,7 @@ cmake_policy(SET CMP0135 NEW)
 FetchContent_Declare(
     boost
     URL            ${BOOST_URL}
-    URL_HASH       SHA256=07247b157f3222e0b57af5630c4f4dd5c5120b12c0a65dd15f72b970c35fce29
+    URL_HASH       SHA256=e2a814b3a158ab482c7a3d330f8bf5a7a8423d258a4e2fb396996e00fcee2111
     SOURCE_DIR     ${CMAKE_CURRENT_BINARY_DIR}/boost-src
 )
 
@@ -39,7 +39,7 @@ target_include_directories(omnibyte_boost INTERFACE
 # Version info
 target_compile_definitions(omnibyte_boost INTERFACE
     BOOST_VERSION_MAJOR=1
-    BOOST_VERSION_MINOR=83
+    BOOST_VERSION_MINOR=92
     BOOST_VERSION_PATCH=0
-    OMNIBYTE_BOOST_VERSION="1.83.0"
+    OMNIBYTE_BOOST_VERSION="1.92.0"
 )

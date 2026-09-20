@@ -1,7 +1,7 @@
 #pragma once
 // Boost -- OmniByte Boost wrapper for reverse engineering operations.
 // Source: https://github.com/boostorg/boost (BSL-1.0)
-// Version: 1.83.0
+// Version: 1.92.0
 //
 // Provides RE-specific functions using selected Boost libraries:
 //   - boost/container_hash: hash functions for containers
@@ -11,7 +11,12 @@
 //   - boost/algorithm: string algorithms, searching
 //   - boost/format: formatted string output
 //
-// ponytail: header-only Boost subset; no heavy runtime.
+// Pattern matching algorithms (no external dependency):
+//   - Boyer-Moore-Horspool: O(n/m) average for single pattern
+//   - Knuth-Morris-Pratt: O(n) for repetitive patterns
+//   - Aho-Corasick: O(n + z) for multi-pattern matching
+//
+// ponytail: header-only Boost subset; pattern scanner is self-contained.
 
 #include <cstdint>
 #include <cstddef>
