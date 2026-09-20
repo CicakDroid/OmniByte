@@ -316,4 +316,168 @@ int32_t List::extractBranchOffset(uint8_t opcode, const uint8_t* data, size_t da
     return 0;
 }
 
+CFGResult List::buildCFGFromDisassembly(
+    uint64_t entryAddress,
+    const std::vector<CFGInstruction>& instructions
+) const {
+    CFGResult result;
+    if (instructions.empty()) {
+        result.success = true;
+        return result;
+    }
+
+    result.entryAddress = instructions.front().address;
+
+    std::set<uint64_t> leaders;
+    leaders.insert(instructions.front().address);
+
+    for (const auto& instr : instructions) {
+        if (isBranchMnemonic(instr.mnemonic)) {
+            uint64_t target = parseBranchTarget(instr.opStr);
+            if (target != 0) {
+                leaders.insert(target);
+            }
+            auto next = std::upper_bound(
+                instructions.begin(), instructions.end(), instr,
+                [](const CFGInstruction& a, const CFGInstruction& b) {
+                    return a.address < b.address;
+                });
+            if (next != instructions.end()) {
+                leaders.insert(next->address);
+            }
+        }
+    }
+
+    for (const auto& instr : instructions) {
+        if (leaders.count(instr.address) || result.blocks.empty()) {
+            auto& block = result.blocks[instr.address];
+            block.startAddr = instr.address;
+        }
+        auto& block = result.blocks.rbegin()->second;
+        block.endAddr = instr.address;
+    }
+
+    for (auto& [addr, block] : result.blocks) {
+        auto instrIt = std::find_if(instructions.begin(), instructions.end(),
+            [addr](const CFGInstruction& i) { return i.address == addr; });
+        if (instrIt == instructions.end()) continue;
+
+        const auto* last = &(*instrIt);
+        auto nextIt = std::upper_bound(instructions.begin(), instructions.end(), *last,
+            [](const CFGInstruction& a, const CFGInstruction& b) {
+                return a.address < b.address;
+            });
+
+        if (last->mnemonic == "ret") {
+            result.edges.push_back({addr, 0, EdgeType::Return});
+        } else if (isBranchMnemonic(last->mnemonic)) {
+            uint64_t target = parseBranchTarget(last->opStr);
+            if (target != 0 && result.blocks.find(target) != result.blocks.end()) {
+                block.successors.push_back(target);
+                result.blocks[target].predecessors.push_back(addr);
+                result.edges.push_back({addr, target, EdgeType::Branch});
+                if (target <= addr) {
+                    result.blocks[target].isLoopHeader = true;
+                }
+            } else if (target != 0) {
+                result.unresolvedEdges.emplace_back(addr, target);
+            }
+            if (!isUnconditionalBranchMnemonic(last->mnemonic) &&
+                nextIt != instructions.end() &&
+                result.blocks.find(nextIt->address) != result.blocks.end()) {
+                block.successors.push_back(nextIt->address);
+                result.blocks[nextIt->address].predecessors.push_back(addr);
+                result.edges.push_back({addr, nextIt->address, EdgeType::FallThrough});
+            }
+        } else if (isCallMnemonic(last->mnemonic)) {
+            if (nextIt != instructions.end() &&
+                result.blocks.find(nextIt->address) != result.blocks.end()) {
+                block.successors.push_back(nextIt->address);
+                result.blocks[nextIt->address].predecessors.push_back(addr);
+                result.edges.push_back({addr, nextIt->address, EdgeType::Call});
+            }
+        } else {
+            if (nextIt != instructions.end() &&
+                result.blocks.find(nextIt->address) != result.blocks.end()) {
+                block.successors.push_back(nextIt->address);
+                result.blocks[nextIt->address].predecessors.push_back(addr);
+                result.edges.push_back({addr, nextIt->address, EdgeType::FallThrough});
+            }
+        }
+    }
+
+    if (!result.blocks.empty()) {
+        uint64_t entry = result.blocks.begin()->first;
+        result.blocks[entry].dominators.insert(entry);
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (auto& [addr, block] : result.blocks) {
+                if (addr == entry) continue;
+                std::set<uint64_t> newDoms;
+                bool firstPred = true;
+                for (uint64_t pred : block.predecessors) {
+                    if (result.blocks.find(pred) != result.blocks.end()) {
+                        if (firstPred) {
+                            newDoms = result.blocks[pred].dominators;
+                            firstPred = false;
+                        } else {
+                            std::set<uint64_t> intersect;
+                            std::set_intersection(
+                                newDoms.begin(), newDoms.end(),
+                                result.blocks[pred].dominators.begin(),
+                                result.blocks[pred].dominators.end(),
+                                std::inserter(intersect, intersect.begin()));
+                            newDoms = intersect;
+                        }
+                    }
+                }
+                newDoms.insert(addr);
+                if (newDoms != block.dominators) {
+                    block.dominators = newDoms;
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    result.totalBlocks = result.blocks.size();
+    result.totalEdges = result.edges.size();
+    result.success = true;
+    return result;
+}
+
+bool List::isBranchMnemonic(const std::string& m) {
+    return m == "b" || m == "beq" || m == "bne" || m == "blt" ||
+           m == "bge" || m == "ble" || m == "bgt" || m == "bhs" ||
+           m == "blo" || m == "bhi" || m == "bls" || m == "bpl" ||
+           m == "bmi" || m == "bvs" || m == "bvc" || m == "bcs" ||
+           m == "bcc" || m == "br" || m == "cbz" || m == "cbnz";
+}
+
+bool List::isUnconditionalBranchMnemonic(const std::string& m) {
+    return m == "b" || m == "br";
+}
+
+bool List::isCallMnemonic(const std::string& m) {
+    return m == "bl" || m == "blr";
+}
+
+uint64_t List::parseBranchTarget(const std::string& opStr) {
+    std::string s = opStr;
+    if (!s.empty() && s[0] == '#') s = s.substr(1);
+    if (s.size() > 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
+        try {
+            return std::stoull(s, nullptr, 16);
+        } catch (...) {
+            return 0;
+        }
+    }
+    try {
+        return std::stoull(s, nullptr, 0);
+    } catch (...) {
+        return 0;
+    }
+}
+
 } // namespace omnibyte::hydradis

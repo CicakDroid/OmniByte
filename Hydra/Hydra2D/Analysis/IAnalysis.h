@@ -89,13 +89,36 @@ struct TaintResult {
     std::vector<uint64_t> taintedAddresses; // addresses carrying tainted data
 };
 
-/// Results from function naming analysis.
+enum class FunctionDetectionSource {
+    Unknown,
+    SymbolTable,
+    Prologue,
+    CallSite,
+    PLTStub,
+    FunctionEnd,
+    Thunk
+};
+
+struct FunctionInfo {
+    uint64_t startAddr = 0;
+    uint64_t endAddr = 0;
+    std::string name;
+    std::string demangledName;
+    std::vector<uint64_t> callers;
+    std::vector<uint64_t> callees;
+    bool isExport = false;
+    bool isImport = false;
+    bool isPltStub = false;
+    FunctionDetectionSource source = FunctionDetectionSource::Unknown;
+};
+
 struct FunctionsResult {
     bool success = false;
     std::string errorMessage;
-    std::vector<uint64_t> functionAddresses; // discovered function addresses
-    size_t namedFunctions = 0;              // functions with assigned names
-    std::unordered_map<uint64_t, std::string> functionNames; // addr → suggested name
+    std::vector<uint64_t> functionAddresses;
+    size_t namedFunctions = 0;
+    std::unordered_map<uint64_t, std::string> functionNames;
+    std::vector<FunctionInfo> functions;
 };
 
 /// Results from variable naming analysis.
@@ -131,6 +154,34 @@ struct ConfidencesResult {
     std::string errorMessage;
     double overallConfidence = 0.0;         // average confidence across all results
     std::unordered_map<std::string, double> categoryConfidence; // category → confidence
+};
+
+/// Vtable/type-info detection source.
+enum class VtableDetectionSource {
+    Unknown,
+    SymbolTable,
+    SectionScan
+};
+
+/// Info about one detected vtable/type.
+struct VtableInfo {
+    std::string mangledName;
+    std::string demangledName;
+    uint64_t vtableAddr = 0;
+    std::vector<uint64_t> vtableEntries;
+    std::vector<std::string> baseClasses;
+    size_t vtableSize = 0;
+    VtableDetectionSource source = VtableDetectionSource::Unknown;
+};
+
+/// Results from vtable/type-info analysis (RTTI).
+struct VtablesResult {
+    bool success = false;
+    std::string errorMessage;
+    std::vector<VtableInfo> vtables;
+    size_t totalVtables = 0;
+    size_t totalTypeInfo = 0;
+    std::unordered_map<uint64_t, std::string> vtableToClass; // vtableAddr → className
 };
 
 /// Results from string classification analysis.

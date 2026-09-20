@@ -3,33 +3,8 @@
 #include "Analysis/Tree.h"
 #include <sstream>
 #include <map>
-#include <set>
-#include <algorithm>
 
 namespace omnibyte::hydradis::plugin {
-
-struct BasicBlock {
-    uint64_t startAddr = 0;
-    uint64_t endAddr = 0;
-    std::vector<const Instruction*> instructions;
-    std::set<uint64_t> successors;
-    std::set<uint64_t> predecessors;
-    bool isLoopHeader = false;
-    std::set<uint64_t> dominators;
-};
-
-enum class EdgeType {
-    FallThrough,
-    Branch,
-    Call,
-    Return
-};
-
-struct Edge {
-    uint64_t from = 0;
-    uint64_t to = 0;
-    EdgeType type = EdgeType::FallThrough;
-};
 
 class EnhancedCfgPlugin : public IPlugin {
 public:
@@ -46,142 +21,41 @@ public:
             return result;
         }
 
-        std::map<uint64_t, const Instruction*> instrMap;
-        std::map<uint64_t, const Instruction*> branchTargets;
-        std::vector<uint8_t> codeData;
+        omnibyte::hydradis::List listAnalyzer;
+        omnibyte::hydradis::Tree treeAnalyzer;
+
+        std::vector<omnibyte::hydradis::CFGInstruction> instructions;
         uint64_t entryAddr = 0;
 
         for (const auto& sec : *ctx.disassemblyResults) {
             for (const auto& instr : sec.instructions) {
-                instrMap[instr.address] = &instr;
                 if (entryAddr == 0) entryAddr = instr.address;
+                instructions.push_back({instr.address, instr.mnemonic, instr.opStr});
             }
         }
 
-        if (!instrMap.empty()) {
-            uint64_t lowest = instrMap.begin()->first;
-            uint64_t highest = instrMap.rbegin()->first;
-            codeData.resize(static_cast<size_t>(highest - lowest) + 4, 0);
-            for (const auto& [addr, instr] : instrMap) {
-                size_t offset = static_cast<size_t>(addr - lowest);
-                if (offset + instr->bytes.size() <= codeData.size()) {
-                    std::copy(instr->bytes.begin(), instr->bytes.end(),
-                              codeData.begin() + offset);
-                }
-            }
-            entryAddr = lowest;
+        if (instructions.empty()) {
+            result.errorMessage = "No instructions found in disassembly";
+            return result;
         }
 
-        std::set<uint64_t> leaders;
-        leaders.insert(instrMap.begin()->first);
+        entryAddr = instructions.front().address;
 
-        for (const auto& [addr, instr] : instrMap) {
-            if (isBranch(instr->mnemonic)) {
-                uint64_t target = parseTarget(instr->opStr);
-                if (target != 0 && instrMap.find(target) != instrMap.end()) {
-                    leaders.insert(target);
-                }
-                auto next = instrMap.upper_bound(addr);
-                if (next != instrMap.end()) {
-                    leaders.insert(next->first);
+        auto cfgResult = listAnalyzer.buildCFGFromDisassembly(entryAddr, instructions);
+
+        std::vector<uint8_t> codeData;
+        if (!instructions.empty()) {
+            uint64_t lowest = instructions.front().address;
+            uint64_t highest = instructions.back().address;
+            for (const auto& sec : *ctx.disassemblyResults) {
+                for (const auto& instr : sec.instructions) {
+                    size_t offset = static_cast<size_t>(instr.address - lowest);
+                    size_t end = offset + instr.bytes.size();
+                    if (end > codeData.size()) codeData.resize(end, 0);
+                    std::copy(instr.bytes.begin(), instr.bytes.end(), codeData.begin() + offset);
                 }
             }
         }
-
-        std::map<uint64_t, BasicBlock> blocks;
-        for (const auto& [addr, instr] : instrMap) {
-            if (leaders.count(addr) || blocks.empty()) {
-                auto& block = blocks[addr];
-                block.startAddr = addr;
-            }
-            auto& block = *blocks.rbegin();
-            block.second.instructions.push_back(instr);
-            block.second.endAddr = addr;
-        }
-
-        std::vector<Edge> edges;
-        std::vector<std::pair<uint64_t, uint64_t>> unresolvedEdges;
-        for (auto& [addr, block] : blocks) {
-            if (block.instructions.empty()) continue;
-            const auto* last = block.instructions.back();
-
-            if (last->mnemonic == "ret") {
-                edges.push_back({addr, 0, EdgeType::Return});
-            } else if (isBranch(last->mnemonic)) {
-                uint64_t target = parseTarget(last->opStr);
-                if (target != 0) {
-                    if (blocks.find(target) != blocks.end()) {
-                        block.successors.insert(target);
-                        blocks[target].predecessors.insert(addr);
-                        edges.push_back({addr, target, EdgeType::Branch});
-                        if (target <= addr) {
-                            blocks[target].isLoopHeader = true;
-                        }
-                    } else {
-                        unresolvedEdges.emplace_back(addr, target);
-                    }
-                }
-                if (!isUnconditionalBranch(last->mnemonic)) {
-                    auto next = instrMap.upper_bound(addr);
-                    if (next != instrMap.end() && blocks.find(next->first) != blocks.end()) {
-                        block.successors.insert(next->first);
-                        blocks[next->first].predecessors.insert(addr);
-                        edges.push_back({addr, next->first, EdgeType::FallThrough});
-                    }
-                }
-            } else if (isCall(last->mnemonic)) {
-                auto next = instrMap.upper_bound(addr);
-                if (next != instrMap.end() && blocks.find(next->first) != blocks.end()) {
-                    block.successors.insert(next->first);
-                    blocks[next->first].predecessors.insert(addr);
-                    edges.push_back({addr, next->first, EdgeType::Call});
-                }
-            } else {
-                auto next = instrMap.upper_bound(addr);
-                if (next != instrMap.end() && blocks.find(next->first) != blocks.end()) {
-                    block.successors.insert(next->first);
-                    blocks[next->first].predecessors.insert(addr);
-                    edges.push_back({addr, next->first, EdgeType::FallThrough});
-                }
-            }
-        }
-
-        if (!blocks.empty()) {
-            uint64_t entry = blocks.begin()->first;
-            blocks[entry].dominators.insert(entry);
-            bool changed = true;
-            while (changed) {
-                changed = false;
-                for (auto& [addr, block] : blocks) {
-                    if (addr == entry) continue;
-                    std::set<uint64_t> newDoms;
-                    bool firstPred = true;
-                    for (uint64_t pred : block.predecessors) {
-                        if (blocks.find(pred) != blocks.end()) {
-                            if (firstPred) {
-                                newDoms = blocks[pred].dominators;
-                                firstPred = false;
-                            } else {
-                                std::set<uint64_t> intersect;
-                                std::set_intersection(
-                                    newDoms.begin(), newDoms.end(),
-                                    blocks[pred].dominators.begin(), blocks[pred].dominators.end(),
-                                    std::inserter(intersect, intersect.begin()));
-                                newDoms = intersect;
-                            }
-                        }
-                    }
-                    newDoms.insert(addr);
-                    if (newDoms != block.dominators) {
-                        block.dominators = newDoms;
-                        changed = true;
-                    }
-                }
-            }
-        }
-
-        omnibyte::hydradis::List listAnalyzer;
-        omnibyte::hydradis::Tree treeAnalyzer;
 
         auto dfsResult = listAnalyzer.dfsTraversal(entryAddr, codeData);
         auto sccResult = listAnalyzer.findStronglyConnectedComponents(codeData);
@@ -192,13 +66,12 @@ public:
         json << "{";
         json << "\"blocks\":[";
         bool first = true;
-        for (const auto& [addr, block] : blocks) {
+        for (const auto& [addr, block] : cfgResult.blocks) {
             if (!first) json << ",";
             first = false;
             json << "{";
             json << "\"start\":\"0x" << toHex(block.startAddr) << "\",";
             json << "\"end\":\"0x" << toHex(block.endAddr) << "\",";
-            json << "\"instructionCount\":" << block.instructions.size() << ",";
             json << "\"successors\":[";
             bool firstSucc = true;
             for (uint64_t s : block.successors) {
@@ -229,7 +102,7 @@ public:
         json << "],";
         json << "\"edges\":[";
         first = true;
-        for (const auto& edge : edges) {
+        for (const auto& edge : cfgResult.edges) {
             if (!first) json << ",";
             first = false;
             json << "{";
@@ -241,15 +114,15 @@ public:
         json << "],";
         json << "\"unresolvedEdges\":[";
         first = true;
-        for (const auto& [from, to] : unresolvedEdges) {
+        for (const auto& [from, to] : cfgResult.unresolvedEdges) {
             if (!first) json << ",";
             first = false;
             json << "{\"from\":\"0x" << toHex(from) << "\",\"to\":\"0x" << toHex(to) << "\"}";
         }
         json << "],";
-        json << "\"totalBlocks\":" << blocks.size() << ",";
-        json << "\"totalEdges\":" << edges.size() << ",";
-        json << "\"totalUnresolved\":" << unresolvedEdges.size() << ",";
+        json << "\"totalBlocks\":" << cfgResult.totalBlocks << ",";
+        json << "\"totalEdges\":" << cfgResult.totalEdges << ",";
+        json << "\"totalUnresolved\":" << cfgResult.unresolvedEdges.size() << ",";
         json << "\"dfsTraversal\":[";
         first = true;
         for (uint64_t addr : dfsResult.visitedAddresses) {
@@ -302,8 +175,8 @@ public:
 
         result.success = true;
         result.output = json.str();
-        result.metadata["block_count"] = std::to_string(blocks.size());
-        result.metadata["edge_count"] = std::to_string(edges.size());
+        result.metadata["block_count"] = std::to_string(cfgResult.totalBlocks);
+        result.metadata["edge_count"] = std::to_string(cfgResult.totalEdges);
         result.metadata["loop_count"] = std::to_string(loopResult.loopCount);
         result.metadata["component_count"] = std::to_string(sccResult.componentCount);
         return result;
@@ -312,52 +185,19 @@ public:
     void onUnload() override {}
 
 private:
-    static bool isBranch(const std::string& m) {
-        return m == "b" || m == "beq" || m == "bne" || m == "blt" ||
-               m == "bge" || m == "ble" || m == "bgt" || m == "bhs" ||
-               m == "blo" || m == "bhi" || m == "bls" || m == "bpl" ||
-               m == "bmi" || m == "bvs" || m == "bvc" || m == "bcs" ||
-               m == "bcc" || m == "br" || m == "cbz" || m == "cbnz";
-    }
-
-    static bool isUnconditionalBranch(const std::string& m) {
-        return m == "b" || m == "br";
-    }
-
-    static bool isCall(const std::string& m) {
-        return m == "bl" || m == "blr";
-    }
-
-    static uint64_t parseTarget(const std::string& opStr) {
-        std::string s = opStr;
-        if (!s.empty() && s[0] == '#') s = s.substr(1);
-        if (s.size() > 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
-            try {
-                return std::stoull(s, nullptr, 16);
-            } catch (...) {
-                return 0;
-            }
-        }
-        try {
-            return std::stoull(s, nullptr, 0);
-        } catch (...) {
-            return 0;
-        }
-    }
-
     static std::string toHex(uint64_t val) {
         std::ostringstream oss;
         oss << std::hex << val;
         return oss.str();
     }
 
-    static const char* edgeTypeStr(EdgeType t) {
+    static const char* edgeTypeStr(omnibyte::hydradis::EdgeType t) {
         switch (t) {
-            case EdgeType::FallThrough: return "fallthrough";
-            case EdgeType::Branch:      return "branch";
-            case EdgeType::Call:        return "call";
-            case EdgeType::Return:      return "return";
-            default:                    return "unknown";
+            case omnibyte::hydradis::EdgeType::FallThrough: return "fallthrough";
+            case omnibyte::hydradis::EdgeType::Branch:      return "branch";
+            case omnibyte::hydradis::EdgeType::Call:        return "call";
+            case omnibyte::hydradis::EdgeType::Return:      return "return";
+            default:                                        return "unknown";
         }
     }
 };

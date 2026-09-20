@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <set>
 
 namespace omnibyte::hydradis {
 
@@ -39,6 +40,94 @@ FunctionsResult Functions::analyzeFunctions(
     return result;
 }
 
+FunctionsResult Functions::analyzeFunctions(
+    uint64_t codeBaseAddr,
+    const std::vector<uint8_t>& codeData,
+    const std::vector<SymbolInfo>& symbols
+) const {
+    FunctionsResult result;
+    if (codeData.empty()) {
+        result.success = true;
+        return result;
+    }
+
+    std::map<uint64_t, FunctionInfo> functions;
+
+    detectFromSymbols(symbols, functions);
+
+    auto prologues = findFunctionPrologues(codeData.data(), codeData.size());
+    for (auto addr : prologues) {
+        if (functions.find(addr) == functions.end()) {
+            auto& fn = functions[addr];
+            fn.startAddr = addr;
+            fn.name = "sub_" + toHex(addr);
+            fn.source = FunctionDetectionSource::Prologue;
+        }
+    }
+
+    auto callSites = findCallSites(codeData.data(), codeData.size(), codeBaseAddr);
+    for (auto addr : callSites) {
+        if (functions.find(addr) == functions.end()) {
+            auto& fn = functions[addr];
+            fn.startAddr = addr;
+            fn.name = "sub_" + toHex(addr);
+            fn.source = FunctionDetectionSource::CallSite;
+        }
+    }
+
+    for (auto& [addr, fn] : functions) {
+        if (fn.demangledName.empty() && fn.name.find("_Z") == 0) {
+            fn.demangledName = demangleItanium(fn.name);
+        }
+        if (fn.endAddr == 0) {
+            auto next = functions.upper_bound(fn.startAddr);
+            if (next != functions.end()) {
+                fn.endAddr = next->first - 1;
+            }
+        }
+    }
+
+    for (const auto& [addr, fn] : functions) {
+        result.functionAddresses.push_back(addr);
+        result.functionNames[addr] = fn.name;
+        result.functions.push_back(fn);
+        if (!fn.name.empty()) result.namedFunctions++;
+    }
+
+    std::sort(result.functionAddresses.begin(), result.functionAddresses.end());
+    result.success = true;
+    return result;
+}
+
+void Functions::detectFromSymbols(
+    const std::vector<SymbolInfo>& symbols,
+    std::map<uint64_t, FunctionInfo>& functions
+) const {
+    for (const auto& sym : symbols) {
+        if (sym.value == 0) continue;
+
+        bool isFunc = (sym.type == 2) ||
+                      (sym.name.find("sub_") != std::string::npos) ||
+                      (sym.name.find("_Z") == 0);
+
+        if (isFunc) {
+            auto& fn = functions[sym.value];
+            fn.startAddr = sym.value;
+            if (fn.name.empty() || fn.name.find("sub_") == 0 || fn.name.find("plt_") == 0) {
+                fn.name = sym.name;
+            }
+            fn.isExport = true;
+            fn.source = FunctionDetectionSource::SymbolTable;
+            if (sym.size > 0) {
+                fn.endAddr = sym.value + sym.size - 1;
+            }
+            if (sym.name.find("_Z") == 0) {
+                fn.demangledName = demangleItanium(sym.name);
+            }
+        }
+    }
+}
+
 std::vector<uint64_t> Functions::findFunctionPrologues(
     const uint8_t* data, size_t dataSize
 ) const {
@@ -48,13 +137,11 @@ std::vector<uint64_t> Functions::findFunctionPrologues(
         uint32_t instr = 0;
         std::memcpy(&instr, data + i, 4);
 
-        // STP x29, x30, [sp, #-N]! — classic frame setup
         if ((instr & 0xFFC003FF) == 0xA98003FF) {
             prologues.push_back(static_cast<uint64_t>(i));
             continue;
         }
 
-        // SUB sp, sp, #imm — frame allocation
         if ((instr & 0xFF0003FF) == 0xD10003FF) {
             if (i + 4 <= dataSize) {
                 uint32_t next = 0;
@@ -109,21 +196,90 @@ std::string Functions::guessFunctionName(
 }
 
 bool Functions::isLikelyThunk(uint32_t instruction) const {
-    // B (unconditional branch) — tail call / thunk
     if ((instruction & 0xFC000000) == 0x14000000) return true;
-    // BR xN — indirect tail call
     if ((instruction & 0xFFFFFC1F) == 0xD61F0000) return true;
     return false;
 }
 
 uint64_t Functions::getBLTarget(uint32_t instruction, uint64_t address) const {
-    // BL (unconditional): 100101 imm26
     if ((instruction & 0xFC000000) == 0x94000000) {
         int32_t imm26 = static_cast<int32_t>(instruction & 0x03FFFFFF);
         if (imm26 & 0x02000000) imm26 |= 0xFC000000;
         return address + (imm26 << 2);
     }
     return 0;
+}
+
+std::string Functions::demangleItanium(const std::string& mangled) {
+    if (mangled.empty() || mangled[0] != '_') return mangled;
+
+    std::string result;
+    size_t i = 0;
+
+    if (mangled.size() > 2 && mangled[0] == '_' && mangled[1] == 'Z') {
+        i = 2;
+    } else {
+        return mangled;
+    }
+
+    if (i < mangled.size() && mangled[i] == 'N') {
+        i++;
+        while (i < mangled.size() && mangled[i] != 'E') {
+            if (std::isdigit(mangled[i])) {
+                size_t len = 0;
+                while (i < mangled.size() && std::isdigit(mangled[i])) {
+                    len = len * 10 + (mangled[i] - '0');
+                    i++;
+                }
+                if (i + len <= mangled.size()) {
+                    if (!result.empty()) result += "::";
+                    result += mangled.substr(i, len);
+                    i += len;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        if (i < mangled.size() && mangled[i] == 'E') {
+            i++;
+        }
+    } else if (i < mangled.size() && std::isdigit(mangled[i])) {
+        size_t len = 0;
+        while (i < mangled.size() && std::isdigit(mangled[i])) {
+            len = len * 10 + (mangled[i] - '0');
+            i++;
+        }
+        if (i + len <= mangled.size()) {
+            result = mangled.substr(i, len);
+        }
+    }
+
+    return result.empty() ? mangled : result;
+}
+
+uint64_t Functions::parseBranchTarget(const std::string& opStr) {
+    std::string s = opStr;
+    if (!s.empty() && s[0] == '#') s = s.substr(1);
+    if (s.size() > 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
+        try {
+            return std::stoull(s, nullptr, 16);
+        } catch (...) {
+            return 0;
+        }
+    }
+    try {
+        return std::stoull(s, nullptr, 0);
+    } catch (...) {
+        return 0;
+    }
+}
+
+std::string Functions::toHex(uint64_t val) {
+    std::ostringstream oss;
+    oss << std::hex << val;
+    return oss.str();
 }
 
 } // namespace omnibyte::hydradis
