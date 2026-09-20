@@ -1,8 +1,7 @@
 // DumperManager — Dumper coordination implementation.
 
 #include "DumperManager.h"
-#include "EngineRegistry/EngineRegistry.h"
-#include "../SharedUtils/SharedUtils.h"
+#include "SharedUtils/SharedUtils.h"
 #include <filesystem>
 #include <chrono>
 
@@ -62,13 +61,13 @@ void DumperManager::setErrorCallback(ErrorCallback callback) {
 
 DumperResult DumperManager::execute(const AnalysisTarget& target) {
     DumperResult result;
-    
+    auto& registry = EngineRegistry::instance();
+
     impl_->notifyProgress("Starting dump execution", 0.0f);
 
-    // Execute working mode
     WorkingModeResult modeResult = impl_->workingMode->execute(target.filePath);
     result.workingModeResult = modeResult;
-    
+
     if (!modeResult.success) {
         result.errorMessage = "Working mode failed: " + modeResult.errorMessage;
         impl_->notifyError(result.errorMessage);
@@ -77,35 +76,65 @@ DumperResult DumperManager::execute(const AnalysisTarget& target) {
 
     impl_->notifyProgress("Files processed by working mode", 0.3f);
 
-    // Detect engine for each file
     for (const auto& file : modeResult.filesProcessed) {
-        impl_->notifyProgress("Processing: " + file, 0.4f);
-        
         AnalysisTarget fileTarget = AnalysisTarget::fromFile(file);
-        auto matchResult = detectTarget(fileTarget);
-        
-        if (matchResult && matchResult->best) {
-            result.detectedEngine = matchResult->best->name();
-            result.detectionConfidence = matchResult->bestDetection.confidence;
-            
-            impl_->notifyProgress("Detected: " + result.detectedEngine, 0.6f);
-            
-            // Execute engine analysis
-            auto profile = matchResult->best->resolveProfile(matchResult->bestDetection.detectedVersion);
-            DumpData engineResult = matchResult->best->analyze(fileTarget, profile);
-            
-            result.engineResults.push_back(engineResult);
-            
-            if (!engineResult.success) {
-                result.errors.push_back("Engine analysis failed for " + file);
+
+        switch (impl_->config.dumperMode) {
+        case DumperMode::Auto: {
+            impl_->notifyProgress("Auto-detect: " + file, 0.4f);
+            auto match = detectTarget(fileTarget);
+            if (match && match->best) {
+                result.detectedEngine = match->best->name();
+                result.detectionConfidence = match->bestDetection.confidence;
+                impl_->notifyProgress("Detected: " + result.detectedEngine, 0.6f);
+                auto profile = match->best->resolveProfile(match->bestDetection.detectedVersion);
+                DumpData engineResult = match->best->analyze(fileTarget, profile);
+                result.engineResults.push_back(engineResult);
+                if (!engineResult.success) {
+                    result.errors.push_back("Engine analysis failed for " + file);
+                }
+            } else {
+                result.errors.push_back("No engine matched for " + file);
             }
-        } else {
-            result.errors.push_back("No engine matched for " + file);
+            break;
+        }
+        case DumperMode::Manual: {
+            impl_->notifyProgress("Manual: " + impl_->config.manualEngineName, 0.4f);
+            auto engine = registry.findEngine(impl_->config.manualEngineName);
+            if (engine) {
+                auto match = engine->detect(fileTarget);
+                auto profile = engine->resolveProfile(match.detectedVersion);
+                DumpData engineResult = engine->analyze(fileTarget, profile);
+                result.detectedEngine = engine->name();
+                result.detectionConfidence = match.confidence;
+                result.engineResults.push_back(engineResult);
+                if (!engineResult.success) {
+                    result.errors.push_back("Engine analysis failed for " + file);
+                }
+            } else {
+                result.errors.push_back("Engine not found: " + impl_->config.manualEngineName);
+            }
+            break;
+        }
+        case DumperMode::MultiDump: {
+            impl_->notifyProgress("MultiDump all engines: " + file, 0.4f);
+            for (const auto& engine : registry.allEngines()) {
+                auto detection = engine->detect(fileTarget);
+                if (detection.confidence > 0.0f) {
+                    auto profile = engine->resolveProfile(detection.detectedVersion);
+                    DumpData engineResult = engine->analyze(fileTarget, profile);
+                    result.engineResults.push_back(engineResult);
+                    if (!engineResult.success) {
+                        result.errors.push_back(engine->name() + " analysis failed for " + file);
+                    }
+                }
+            }
+            break;
+        }
         }
     }
 
     impl_->notifyProgress("Dump execution complete", 1.0f);
-    
     result.success = !result.engineResults.empty();
     return result;
 }

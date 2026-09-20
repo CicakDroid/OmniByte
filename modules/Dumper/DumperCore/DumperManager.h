@@ -6,8 +6,9 @@
 #include <vector>
 #include <memory>
 #include <functional>
-#include "../WorkingModes/WorkingMode.h"
+#include "WorkingModes/WorkingMode.h"
 #include "AnalysisTarget.h"
+#include "EngineRegistry.h"
 #include "IDumperEngine.h"
 #include "DumpResult.h"
 
@@ -15,12 +16,14 @@ namespace omnibyte::dumper {
 
 /// Dumper execution configuration
 struct DumperConfig {
+    DumperMode dumperMode = DumperMode::Auto;
     WorkingModeType workingMode = WorkingModeType::Manual;
+    std::string manualEngineName;       // dipakai saat DumperMode::Manual
     bool enableSignatureDetection = true;
     bool enablePatternScanning = true;
     bool enableYaraScanning = true;
-    std::string databasePath;           // Path to signature database
-    std::string yaraRulesPath;          // Path to YARA rules
+    std::string databasePath;
+    std::string yaraRulesPath;
     uint32_t timeoutMs = 30000;
 };
 
@@ -28,6 +31,7 @@ struct DumperConfig {
 struct DumperResult {
     bool success = false;
     std::string errorMessage;
+    std::vector<std::string> errors;
     WorkingModeResult workingModeResult;
     std::vector<DumpData> engineResults;
     std::string detectedEngine;

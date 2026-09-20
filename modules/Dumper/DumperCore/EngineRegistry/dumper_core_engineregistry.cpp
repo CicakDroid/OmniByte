@@ -73,6 +73,15 @@ std::optional<EngineRegistry::MatchResult> EngineRegistry::detectBestMatch(
     return result;
 }
 
+std::shared_ptr<IDumperEngine> EngineRegistry::findEngine(const std::string& name) const {
+    for (const auto& engine : engines_) {
+        if (engine->name() == name) {
+            return engine;
+        }
+    }
+    return nullptr;
+}
+
 std::vector<std::shared_ptr<IDumperEngine>> EngineRegistry::allEngines() const {
     return engines_;
 }

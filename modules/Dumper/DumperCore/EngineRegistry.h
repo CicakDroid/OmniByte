@@ -29,6 +29,8 @@ public:
 
     std::optional<MatchResult> detectBestMatch(const AnalysisTarget& target) const;
 
+    std::shared_ptr<IDumperEngine> findEngine(const std::string& name) const;
+
     std::vector<std::shared_ptr<IDumperEngine>> allEngines() const;
 
 private:
