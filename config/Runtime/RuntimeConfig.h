@@ -38,6 +38,10 @@ struct RuntimeConfig {
     std::vector<std::string> hookBackendPriority = {"KittyMemory", "Inlinehook", "Vector",
                                                      "Albatross", "Bhook", "KittyMemoryEx"};
     std::vector<std::string> stealthBackendPriority = {"Diamorphine", "Bypasser"};
+    // Priority order for root provider backends (FreedomService).
+    std::vector<std::string> freedomProviderPriority = {"KernelSU", "SukiSU-Ultra", "SUI", "RootThread"};
+    // Priority order for memory editing backends (HPT MemoryEditor).
+    std::vector<std::string> memoryBackendPriority = {"KittyMemory"};
     bool enableMemoryWrite = false;
 
     static RuntimeConfig defaults() { return {}; }
@@ -69,6 +73,12 @@ struct RuntimeConfig {
         if (j.contains("stealthBackendPriority") && j.at("stealthBackendPriority").is_array()) {
             cfg.stealthBackendPriority = j.at("stealthBackendPriority").get<std::vector<std::string>>();
         }
+        if (j.contains("freedomProviderPriority") && j.at("freedomProviderPriority").is_array()) {
+            cfg.freedomProviderPriority = j.at("freedomProviderPriority").get<std::vector<std::string>>();
+        }
+        if (j.contains("memoryBackendPriority") && j.at("memoryBackendPriority").is_array()) {
+            cfg.memoryBackendPriority = j.at("memoryBackendPriority").get<std::vector<std::string>>();
+        }
         cfg.enableMemoryWrite = omnibyte::common::getOr<bool>(j, "enableMemoryWrite", cfg.enableMemoryWrite);
 
         return cfg;
@@ -94,6 +104,8 @@ struct RuntimeConfig {
             {"requireStealth",           requireStealth},
             {"hookBackendPriority",      hookBackendPriority},
             {"stealthBackendPriority",   stealthBackendPriority},
+            {"freedomProviderPriority",  freedomProviderPriority},
+            {"memoryBackendPriority",    memoryBackendPriority},
             {"enableMemoryWrite",        enableMemoryWrite}
         };
     }

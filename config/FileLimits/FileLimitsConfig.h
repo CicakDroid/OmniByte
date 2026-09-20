@@ -13,7 +13,8 @@ struct FileLimitsConfig {
     uint64_t maxFileSizeBytes = 500ULL * 1024 * 1024;  // 500 MB
     uint64_t chunkSizeBytes = 4ULL * 1024 * 1024;      // 4 MB
     std::vector<std::string> allowedExtensions = {
-        ".apk", ".so", ".dll", ".pak", ".win", ".pck", ".ung", ".bsp"
+        ".apk", ".so", ".dll", ".pak", ".win", ".pck", ".ung", ".bsp",
+        ".dat", ".luac", ".yy", ".xapk", ".aar", ".aab", ".jar"
     };
     size_t exportSplitMaxLines = 100000;
 
