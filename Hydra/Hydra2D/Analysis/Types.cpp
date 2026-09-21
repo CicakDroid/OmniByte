@@ -195,6 +195,199 @@ bool Types::isArrayAccess(uint32_t instruction) const {
     return false;
 }
 
+RecoveryResult Types::recoverTypes(
+    const std::vector<SymbolInfo>& symbols,
+    const std::vector<SectionInfo>& sections
+) const {
+    RecoveryResult result;
+
+    VtablesResult vtablesResult = analyzeVtables(symbols, sections);
+
+    for (const auto& vt : vtablesResult.vtables) {
+        if (vt.vtableAddr == 0) continue;
+
+        TypeInfo ti;
+        ti.className = extractClassNameFromVtable(vt.mangledName);
+        ti.mangledName = vt.mangledName;
+        ti.vtableAddr = vt.vtableAddr;
+        ti.baseClasses = vt.baseClasses;
+        ti.vtableSize = vt.vtableSize;
+        ti.isPolymorphic = true;
+        ti.hasRTTI = false;
+
+        for (const auto& sym : symbols) {
+            if (sym.name.find("_ZTI") == 0) {
+                std::string baseName = extractClassNameFromTypeinfo(sym.name);
+                if (baseName == ti.className) {
+                    ti.typeinfoAddr = sym.value;
+                    ti.hasRTTI = true;
+
+                    std::vector<std::string> chain = resolveInheritanceChain(sym.name, symbols);
+                    if (!chain.empty()) {
+                        ti.baseClasses = chain;
+                    }
+                    break;
+                }
+            }
+        }
+
+        const SectionInfo* codeSection = nullptr;
+        for (const auto& sec : sections) {
+            if (sec.name == ".text" || sec.name == ".plt") {
+                codeSection = &sec;
+                break;
+            }
+        }
+
+        if (codeSection && vt.vtableSize > 0) {
+            std::vector<uint8_t> sectionData(codeSection->size, 0);
+            ti.virtualMethods = recoverVirtualMethods(
+                vt.vtableAddr, vt.vtableSize,
+                sectionData, codeSection->virtualAddress,
+                symbols
+            );
+
+            ti.methodCount = 0;
+            for (const auto& method : ti.virtualMethods) {
+                if (!method.isPureVirtual) {
+                    ti.methodCount++;
+                }
+            }
+
+            for (const auto& method : ti.virtualMethods) {
+                if (method.isPureVirtual) {
+                    ti.isAbstract = true;
+                    break;
+                }
+            }
+        }
+
+        result.types.push_back(ti);
+    }
+
+    buildClassHierarchy(result.types, result.hierarchy);
+
+    result.totalClasses = result.types.size();
+    result.totalMethods = 0;
+    for (const auto& ti : result.types) {
+        result.totalMethods += ti.methodCount;
+    }
+    result.totalHierarchyLinks = 0;
+    for (const auto& [name, node] : result.hierarchy) {
+        result.totalHierarchyLinks += node.baseClasses.size();
+    }
+
+    result.success = true;
+    return result;
+}
+
+std::vector<VirtualMethod> Types::recoverVirtualMethods(
+    uint64_t vtableAddr,
+    size_t entryCount,
+    const std::vector<uint8_t>& sectionData,
+    uint64_t sectionBaseAddr,
+    const std::vector<SymbolInfo>& symbols
+) const {
+    std::vector<VirtualMethod> methods;
+
+    for (size_t i = 0; i < entryCount; i++) {
+        VirtualMethod method;
+        method.offset = i * 8;
+        method.targetAddr = 0;
+        method.isPureVirtual = true;
+        method.isDestructor = false;
+
+        for (const auto& sym : symbols) {
+            if (sym.value == vtableAddr + method.offset && sym.value != 0) {
+                method.targetAddr = sym.value;
+                method.name = sym.demangledName.empty() ? sym.name : sym.demangledName;
+                method.mangledName = sym.name;
+                method.isPureVirtual = false;
+
+                if (sym.name.find("_Z") != std::string::npos) {
+                    std::string demangled = sym.demangledName;
+                    if (demangled.find('~') != std::string::npos) {
+                        method.isDestructor = true;
+                    }
+                }
+                break;
+            }
+        }
+
+        methods.push_back(method);
+    }
+
+    return methods;
+}
+
+std::vector<std::string> Types::resolveInheritanceChain(
+    const std::string& mangledTypeinfo,
+    const std::vector<SymbolInfo>& symbols
+) const {
+    std::vector<std::string> chain;
+
+    std::string className = extractClassNameFromTypeinfo(mangledTypeinfo);
+    if (className.empty()) return chain;
+    chain.push_back(className);
+
+    for (const auto& sym : symbols) {
+        if (sym.name.find("_ZTIS") == 0 || sym.name.find("_ZTIN") == 0) {
+            std::string baseName = extractClassNameFromTypeinfo(sym.name);
+            if (!baseName.empty() && baseName != className) {
+                std::string parentClass;
+                for (size_t i = 0; i + 1 < sym.name.size(); i++) {
+                    if (sym.name[i] == 'E') {
+                        parentClass = sym.name.substr(4, i - 4);
+                        break;
+                    }
+                }
+                if (!parentClass.empty()) {
+                    chain.push_back(parentClass);
+                }
+            }
+        }
+    }
+
+    return chain;
+}
+
+void Types::buildClassHierarchy(
+    const std::vector<TypeInfo>& types,
+    std::unordered_map<std::string, ClassNode>& hierarchy
+) const {
+    for (const auto& ti : types) {
+        ClassNode node;
+        node.className = ti.className;
+        node.baseClasses = ti.baseClasses;
+        node.hasVtable = ti.isPolymorphic;
+        node.hasRTTI = ti.hasRTTI;
+        hierarchy[ti.className] = node;
+    }
+
+    for (auto& [name, node] : hierarchy) {
+        for (const auto& base : node.baseClasses) {
+            if (hierarchy.find(base) != hierarchy.end()) {
+                hierarchy[base].derivedClasses.push_back(name);
+            }
+        }
+    }
+}
+
+std::string Types::extractClassNameFromTypeinfo(const std::string& mangled) {
+    std::string prefix = "_ZTI";
+    if (mangled.find(prefix) != 0) return "";
+
+    std::string s = mangled.substr(prefix.size());
+    if (s.empty()) return "";
+    if (std::isdigit(s[0])) {
+        int len = std::stoi(s.substr(0, 1));
+        if (len > 0 && s.size() > 1) {
+            return s.substr(1, len);
+        }
+    }
+    return s;
+}
+
 std::string Types::extractClassNameFromVtable(const std::string& mangled) {
     std::string s = mangled;
     if (s.find("_ZTV") == 0) s = s.substr(4);

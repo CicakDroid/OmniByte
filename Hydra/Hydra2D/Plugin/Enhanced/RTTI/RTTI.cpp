@@ -1,7 +1,6 @@
 #include "Plugin/IPlugin.h"
 #include "Analysis/Types.h"
 #include <map>
-#include <set>
 #include <sstream>
 
 namespace omnibyte::hydradis::plugin {
@@ -22,120 +21,89 @@ public:
         }
 
         omnibyte::hydradis::Types typesAnalyzer;
-        auto vtablesResult = typesAnalyzer.analyzeVtables(
+        auto recoveryResult = typesAnalyzer.recoverTypes(
             ctx.binary->symbols, ctx.binary->sections);
-
-        std::vector<uint8_t> codeData;
-        uint64_t entryAddr = ctx.binary->header.entryPoint;
-
-        if (ctx.disassemblyResults && !ctx.disassemblyResults->empty()) {
-            for (const auto& sec : *ctx.disassemblyResults) {
-                for (const auto& instr : sec.instructions) {
-                    if (!instr.bytes.empty() && entryAddr == ctx.binary->header.entryPoint) {
-                        entryAddr = instr.address;
-                    }
-                }
-            }
-
-            std::map<uint64_t, const Instruction*> instrMap;
-            for (const auto& sec : *ctx.disassemblyResults) {
-                for (const auto& instr : sec.instructions) {
-                    instrMap[instr.address] = &instr;
-                }
-            }
-            if (!instrMap.empty()) {
-                uint64_t lowest = instrMap.begin()->first;
-                uint64_t highest = instrMap.rbegin()->first;
-                codeData.resize(static_cast<size_t>(highest - lowest) + 4, 0);
-                for (const auto& [addr, instr] : instrMap) {
-                    size_t offset = static_cast<size_t>(addr - lowest);
-                    if (offset + instr->bytes.size() <= codeData.size()) {
-                        std::copy(instr->bytes.begin(), instr->bytes.end(),
-                                  codeData.begin() + offset);
-                    }
-                }
-                entryAddr = lowest;
-            }
-        }
-
-        auto typesResult = typesAnalyzer.analyzeTypes(entryAddr, codeData);
-
-        std::set<std::string> seen;
-        std::vector<omnibyte::hydradis::VtableInfo> deduped;
-        for (const auto& t : vtablesResult.vtables) {
-            if (seen.find(t.mangledName) == seen.end()) {
-                seen.insert(t.mangledName);
-                deduped.push_back(t);
-            }
-        }
-
-        for (const auto& [addr, typeName] : typesResult.typeMap) {
-            bool found = false;
-            for (auto& t : deduped) {
-                if (t.vtableAddr == addr) {
-                    t.demangledName += " [" + typeName + "]";
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                std::string name = "type_at_0x" + toHex(addr);
-                deduped.push_back({name, name + " [" + typeName + "]", addr, {}, {}, 0,
-                    omnibyte::hydradis::VtableDetectionSource::Unknown});
-            }
-        }
 
         std::ostringstream json;
         json << "{";
         json << "\"types\":[";
         bool first = true;
-        for (const auto& t : deduped) {
+        for (const auto& ti : recoveryResult.types) {
             if (!first) json << ",";
             first = false;
             json << "{";
-            json << "\"mangled\":\"" << escapeJson(t.mangledName) << "\",";
-            json << "\"demangled\":\"" << escapeJson(t.demangledName) << "\",";
-            json << "\"vtableAddr\":\"0x" << toHex(t.vtableAddr) << "\",";
+            json << "\"className\":\"" << escapeJson(ti.className) << "\",";
+            json << "\"mangledName\":\"" << escapeJson(ti.mangledName) << "\",";
+            json << "\"vtableAddr\":\"0x" << toHex(ti.vtableAddr) << "\",";
+            json << "\"typeinfoAddr\":\"0x" << toHex(ti.typeinfoAddr) << "\",";
             json << "\"baseClasses\":[";
             bool firstBase = true;
-            for (const auto& b : t.baseClasses) {
+            for (const auto& b : ti.baseClasses) {
                 if (!firstBase) json << ",";
                 firstBase = false;
                 json << "\"" << escapeJson(b) << "\"";
             }
             json << "],";
-            json << "\"vtableSize\":" << t.vtableSize;
+            json << "\"virtualMethods\":[";
+            bool firstMethod = true;
+            for (const auto& m : ti.virtualMethods) {
+                if (!firstMethod) json << ",";
+                firstMethod = false;
+                json << "{";
+                json << "\"offset\":" << m.offset << ",";
+                json << "\"targetAddr\":\"0x" << toHex(m.targetAddr) << "\",";
+                json << "\"name\":\"" << escapeJson(m.name) << "\",";
+                json << "\"isPureVirtual\":" << (m.isPureVirtual ? "true" : "false") << ",";
+                json << "\"isDestructor\":" << (m.isDestructor ? "true" : "false");
+                json << "}";
+            }
+            json << "],";
+            json << "\"vtableSize\":" << ti.vtableSize << ",";
+            json << "\"methodCount\":" << ti.methodCount << ",";
+            json << "\"hasRTTI\":" << (ti.hasRTTI ? "true" : "false") << ",";
+            json << "\"isAbstract\":" << (ti.isAbstract ? "true" : "false") << ",";
+            json << "\"isPolymorphic\":" << (ti.isPolymorphic ? "true" : "false");
             json << "}";
         }
         json << "],";
-        json << "\"vtableMapping\":[";
+        json << "\"hierarchy\":[";
         first = true;
-        for (const auto& [addr, className] : vtablesResult.vtableToClass) {
+        for (const auto& [name, node] : recoveryResult.hierarchy) {
             if (!first) json << ",";
             first = false;
             json << "{";
-            json << "\"vtableAddr\":\"0x" << toHex(addr) << "\",";
-            json << "\"className\":\"" << escapeJson(className) << "\"";
+            json << "\"className\":\"" << escapeJson(node.className) << "\",";
+            json << "\"baseClasses\":[";
+            bool firstBase = true;
+            for (const auto& b : node.baseClasses) {
+                if (!firstBase) json << ",";
+                firstBase = false;
+                json << "\"" << escapeJson(b) << "\"";
+            }
+            json << "],";
+            json << "\"derivedClasses\":[";
+            bool firstDerived = true;
+            for (const auto& d : node.derivedClasses) {
+                if (!firstDerived) json << ",";
+                firstDerived = false;
+                json << "\"" << escapeJson(d) << "\"";
+            }
+            json << "],";
+            json << "\"hasVtable\":" << (node.hasVtable ? "true" : "false") << ",";
+            json << "\"hasRTTI\":" << (node.hasRTTI ? "true" : "false");
             json << "}";
         }
         json << "],";
-        json << "\"totalTypes\":" << deduped.size() << ",";
-        json << "\"inferredTypes\":" << typesResult.inferredTypes << ",";
-        json << "\"typeAnalysis\":[";
-        first = true;
-        for (const auto& [addr, typeName] : typesResult.typeMap) {
-            if (!first) json << ",";
-            first = false;
-            json << "{\"addr\":\"0x" << toHex(addr)
-                 << "\",\"type\":\"" << escapeJson(typeName) << "\"}";
-        }
-        json << "]";
+        json << "\"totalTypes\":" << recoveryResult.totalClasses << ",";
+        json << "\"totalMethods\":" << recoveryResult.totalMethods << ",";
+        json << "\"totalHierarchyLinks\":" << recoveryResult.totalHierarchyLinks;
         json << "}";
 
         result.success = true;
         result.output = json.str();
-        result.metadata["type_count"] = std::to_string(deduped.size());
-        result.metadata["inferred_type_count"] = std::to_string(typesResult.inferredTypes);
+        result.metadata["type_count"] = std::to_string(recoveryResult.totalClasses);
+        result.metadata["method_count"] = std::to_string(recoveryResult.totalMethods);
+        result.metadata["hierarchy_links"] = std::to_string(recoveryResult.totalHierarchyLinks);
         return result;
     }
 
