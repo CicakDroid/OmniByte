@@ -3,6 +3,7 @@
 #include "Analysis/Variables.h"
 #include "Analysis/Parameters.h"
 #include "Analysis/Strings.h"
+#include "Analysis/Imports.h"
 #include "Analysis/Confidences.h"
 #include <sstream>
 
@@ -52,6 +53,7 @@ public:
         omnibyte::hydradis::Variables varAnalyzer;
         omnibyte::hydradis::Parameters paramAnalyzer;
         omnibyte::hydradis::Strings strAnalyzer;
+        omnibyte::hydradis::Imports importsAnalyzer;
         omnibyte::hydradis::Confidences confAnalyzer;
 
         omnibyte::hydradis::FunctionsResult functionsResult;
@@ -64,6 +66,11 @@ public:
         auto variablesResult = varAnalyzer.analyzeVariables(codeBaseAddr, codeData);
         auto parametersResult = paramAnalyzer.analyzeParameters(codeBaseAddr, codeData);
         auto confidencesResult = confAnalyzer.analyzeConfidences(codeData);
+
+        omnibyte::hydradis::ImportsResult importsResult;
+        if (ctx.symbols() && !ctx.symbols()->empty()) {
+            importsResult = importsAnalyzer.analyzeImports(codeBaseAddr, codeData, *ctx.symbols());
+        }
 
         omnibyte::hydradis::StringsResult stringsResult;
         if (ctx.binary && !ctx.binary->sections.empty()) {
@@ -143,11 +150,44 @@ public:
                  << "\",\"classification\":\"" << escapeJson(classification) << "\"}";
         }
         json << "],";
+        json << "\"imports\":[";
+        first = true;
+        for (const auto& imp : importsResult.imports) {
+            if (!first) json << ",";
+            first = false;
+            json << "{";
+            json << "\"address\":\"0x" << toHex(imp.address) << "\",";
+            json << "\"resolvedName\":\"" << escapeJson(imp.resolvedName) << "\",";
+            if (!imp.libraryName.empty()) {
+                json << "\"library\":\"" << escapeJson(imp.libraryName) << "\",";
+            }
+            json << "\"type\":\"";
+            switch (imp.type) {
+                case omnibyte::hydradis::ImportType::Function: json << "function"; break;
+                case omnibyte::hydradis::ImportType::Object: json << "object"; break;
+                case omnibyte::hydradis::ImportType::TLS: json << "tls"; break;
+                default: json << "unknown"; break;
+            }
+            json << "\",";
+            json << "\"source\":\"";
+            switch (imp.source) {
+                case omnibyte::hydradis::ImportDetectionSource::PLTStub: json << "plt"; break;
+                case omnibyte::hydradis::ImportDetectionSource::GOTEntry: json << "got"; break;
+                case omnibyte::hydradis::ImportDetectionSource::SymbolTable: json << "symbol"; break;
+                case omnibyte::hydradis::ImportDetectionSource::DynamicReloc: json << "reloc"; break;
+                default: json << "unknown"; break;
+            }
+            json << "\",";
+            json << "\"isWeak\":" << (imp.isWeak ? "true" : "false");
+            json << "}";
+        }
+        json << "],";
         json << "\"confidence\":" << confidencesResult.overallConfidence << ",";
         json << "\"totalFunctions\":" << functionsResult.functions.size() << ",";
         json << "\"totalVariables\":" << variablesResult.namedVariables << ",";
         json << "\"totalParameters\":" << parametersResult.namedParameters << ",";
-        json << "\"totalStrings\":" << stringsResult.classifiedStrings;
+        json << "\"totalStrings\":" << stringsResult.classifiedStrings << ",";
+        json << "\"totalImports\":" << importsResult.imports.size();
         json << "}";
 
         result.success = true;
