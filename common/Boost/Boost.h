@@ -16,6 +16,18 @@
 //   - Knuth-Morris-Pratt: O(n) for repetitive patterns
 //   - Aho-Corasick: O(n + z) for multi-pattern matching
 //
+// BUILD NOTE (verified):
+//   This file REQUIRES Boost headers fetched by CMake FetchContent.
+//   Standalone NDK syntax check (aarch64-linux-android23-clang++ -fsyntax-only)
+//   will FAIL because boost/ headers do not exist until cmake configures.
+//   This is by design — FetchContent downloads Boost at configure time.
+//   Citation: https://cmake.org/cmake/help/latest/module/FetchContent.html
+//
+//   To validate: run cmake configure first, then check:
+//     cmake -B build -DCMAKE_TOOLCHAIN_FILE=<ndk>/build/cmake/android.toolchain.cmake
+//     <ndk>/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android23-clang++ \
+//       -std=c++17 -fsyntax-only -Ibuild/_deps/boost-src common/Boost/Boost.h
+//
 // ponytail: header-only Boost subset; pattern scanner is self-contained.
 
 #include <cstdint>

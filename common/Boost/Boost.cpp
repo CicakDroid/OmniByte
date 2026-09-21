@@ -1,4 +1,6 @@
 // Boost.cpp -- OmniByte Boost wrapper for reverse engineering operations.
+// BUILD NOTE: Requires CMake FetchContent for Boost headers.
+// See Boost.h for details on standalone syntax check limitation.
 
 #include "Boost.h"
 
