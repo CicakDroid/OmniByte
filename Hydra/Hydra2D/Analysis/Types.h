@@ -1,4 +1,7 @@
 #pragma once
+// Types — RTTI and type recovery for C++ binaries.
+// Recovers class hierarchy, virtual method tables (vtables), and inheritance
+// chains from Itanium ABI symbols (_ZTV*, _ZTI*, _ZTS*) and binary structure.
 
 #include "IAnalysis.h"
 #include "Parser/IParser.h"

@@ -18,6 +18,8 @@
 
 namespace omnibyte::hydradis {
 
+struct SymbolInfo;
+
 // ── Result types ────────────────────────────────────────────────────────
 
 /// Results from structure analysis (§56: Trie, BloomFilter, Union-Find).
@@ -193,6 +195,50 @@ struct StringsResult {
     std::unordered_map<uint64_t, std::string> stringClassifications; // addr → category
 };
 
+/// Source of export detection.
+enum class ExportDetectionSource {
+    Unknown,
+    SymbolTable,    // .symtab / .dynsym entry with GLOBAL/DEFAULT binding
+    DynamicTag,     // DT_SYMBOLIC / DT_TEXTREL tags
+    SectionHeader   // .export section (Mach-O style)
+};
+
+/// Type of export reference.
+enum class ExportType {
+    Unknown,
+    Function,       // function export
+    Object,         // data export
+    TLS,            // thread-local storage export
+    Indirect        // indirect export (trampoline / wrapper)
+};
+
+/// Information about one exported symbol.
+struct ExportInfo {
+    uint64_t address = 0;           // address of the exported symbol
+    std::string name;               // exported symbol name
+    std::string demangledName;      // demangled name (C++ symbols)
+    std::string libraryName;        // source library (e.g., "libfoo.so")
+    ExportType type = ExportType::Unknown;
+    ExportDetectionSource source = ExportDetectionSource::Unknown;
+    uint32_t symbolIndex = 0;      // .symtab / .dynsym index
+    uint64_t size = 0;              // symbol size in bytes (0 if unknown)
+    bool isWeak = false;            // WEAK binding
+    bool isTls = false;             // thread-local storage
+    std::string versionTag;         // version symbol (e.g., "GLIBC_2.17")
+};
+
+/// Results from export analysis.
+struct ExportsResult {
+    bool success = false;
+    std::string errorMessage;
+    std::vector<ExportInfo> exports;
+    std::unordered_map<uint64_t, std::string> addressToName;  // addr → name
+    size_t totalExports = 0;
+    size_t functionExports = 0;
+    size_t objectExports = 0;
+    size_t weakExports = 0;
+};
+
 // ── Abstract interface ──────────────────────────────────────────────────
 
 /// Abstract interface for binary analysis algorithms.
@@ -320,6 +366,14 @@ public:
 
     virtual StringsResult analyzeStrings(
         const uint8_t* /*data*/, size_t /*dataSize*/
+    ) const { return {}; }
+
+    // ── Export analysis — default stubs ──────────────────────────────
+
+    virtual ExportsResult analyzeExports(
+        uint64_t /*codeBaseAddr*/,
+        const std::vector<uint8_t>& /*codeData*/,
+        const std::vector<SymbolInfo>& /*symbols*/
     ) const { return {}; }
 };
 

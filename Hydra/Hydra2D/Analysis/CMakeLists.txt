@@ -23,6 +23,7 @@ add_library(hydradis_analysis STATIC
     Confidences.cpp
     Strings.cpp
     Imports.cpp
+    Exports.cpp
 )
 
 # Public headers
