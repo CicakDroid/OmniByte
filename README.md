@@ -80,6 +80,13 @@ OmniByte/
 │   │   ├── Parser/backends/                # LIEF adapter
 │   │   ├── Orchestrator/                   # Orkestrasi analisis
 │   │   ├── Factory/                        # Faktor komponen
+│   │   ├── Analysis/                       # Algoritma analisis biner (15 kelas)
+│   │   │   ├── IAnalysis.h                 # Interface abstrak + Result structs
+│   │   │   ├── Structure, Stack, List, Tree # Algoritma inti (trie, CFG, dominator)
+│   │   │   ├── Packers, Obfuscate, Taint   # Algoritma deteksi
+│   │   │   ├── Functions, Variables, Params # Algoritma penamaan
+│   │   │   ├── Types, Confidences, Strings # Tipe & confidence scoring
+│   │   │   └── Imports, Exports            # Algoritma simbol
 │   │   ├── Plugin/
 │   │   │   ├── Enhanced/                   # Plugin lanjutan
 │   │   │   │   ├── AST/                    # Abstract Syntax Tree
@@ -87,7 +94,7 @@ OmniByte/
 │   │   │   │   ├── Crypt/                  # FindCrypt3, DeCrypt3
 │   │   │   │   ├── Deobfuscate/            # DexKit, hrtng
 │   │   │   │   ├── Emulation/              # Qemu, Unicorn
-│   │   │   │   ├── FunctionResolver/       # Resolusi fungsi
+│   │   │   │   ├── Renamer/                # Penamaan fungsi
 │   │   │   │   ├── RTTI/                   # Runtime Type Info
 │   │   │   │   ├── Signatures/             # MagicBytes, Pattern, Yara, DB
 │   │   │   │   └── SymbolicExecution/      # Triton, Z3, CVC5
@@ -227,14 +234,15 @@ flowchart TB
 (Rizin / rz-ghidra)"]
         H_PAR["Parser
 (LIEF)"]
-        H_PLG["Plugins
-(AST, CFG, Crypt,
-Deobfuscate, Signatures,
-SymbolicExecution)"]
+        H_ANA["Kelas Analysis
+(15 algoritma deteksi)"]
+        H_PLG["Plugin
+(orkestrator + JSON)"]
         H_ORC["Orkestrator"]
         H_DIS --> H_ORC
         H_DEC --> H_ORC
         H_PAR --> H_ORC
+        H_ANA --> H_PLG
         H_PLG --> H_ORC
     end
 

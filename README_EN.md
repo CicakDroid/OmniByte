@@ -80,6 +80,13 @@ OmniByte/
 │   │   ├── Parser/backends/                # LIEF adapter
 │   │   ├── Orchestrator/                   # Analysis orchestration
 │   │   ├── Factory/                        # Component factory
+│   │   ├── Analysis/                       # Binary analysis algorithms (15 classes)
+│   │   │   ├── IAnalysis.h                 # Abstract interface + Result structs
+│   │   │   ├── Structure, Stack, List, Tree # Core algorithms (trie, CFG, dominator)
+│   │   │   ├── Packers, Obfuscate, Taint   # Detection algorithms
+│   │   │   ├── Functions, Variables, Params # Naming algorithms
+│   │   │   ├── Types, Confidences, Strings # Type & scoring algorithms
+│   │   │   └── Imports, Exports            # Symbol algorithms
 │   │   ├── Plugin/
 │   │   │   ├── Enhanced/                   # Advanced plugins
 │   │   │   │   ├── AST/                    # Abstract Syntax Tree
@@ -87,7 +94,7 @@ OmniByte/
 │   │   │   │   ├── Crypt/                  # FindCrypt3, DeCrypt3
 │   │   │   │   ├── Deobfuscate/            # DexKit, hrtng
 │   │   │   │   ├── Emulation/              # Qemu, Unicorn
-│   │   │   │   ├── FunctionResolver/       # Function resolution
+│   │   │   │   ├── Renamer/                # Function renaming
 │   │   │   │   ├── RTTI/                   # Runtime Type Info
 │   │   │   │   ├── Signatures/             # MagicBytes, Pattern, Yara, DB
 │   │   │   │   └── SymbolicExecution/      # Triton, Z3, CVC5
@@ -224,11 +231,13 @@ flowchart TB
         H_DIS["Disassembler\n(Capstone / Rizin)"]
         H_DEC["Decompiler\n(Rizin / rz-ghidra)"]
         H_PAR["Parser\n(LIEF)"]
-        H_PLG["Plugins\n(AST, CFG, Crypt,\nDeobfuscate, Signatures,\nSymbolicExecution)"]
+        H_ANA["Analysis Classes\n(15 detection algorithms)"]
+        H_PLG["Plugins\n(orchestrators + JSON)"]
         H_ORC["Orchestrator"]
         H_DIS --> H_ORC
         H_DEC --> H_ORC
         H_PAR --> H_ORC
+        H_ANA --> H_PLG
         H_PLG --> H_ORC
     end
 
