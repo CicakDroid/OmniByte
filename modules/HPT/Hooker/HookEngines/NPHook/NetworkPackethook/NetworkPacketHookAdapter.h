@@ -19,7 +19,7 @@
 //
 // ponytail: Uses ShadowhookAdapter for inline hooking, no external dependency.
 
-#include "../../IHookEngines.h"
+#include "../../../IHookEngines.h"
 
 #include <string>
 #include <unordered_map>

@@ -15,5 +15,5 @@ add_subdirectory(UnityMono)
 add_subdirectory(Source2)
 add_subdirectory(Godot)
 add_subdirectory(GameMaker)
-add_subdirectory(Cocos2d)
+add_subdirectory(Cocos)
 # Dumper1 merged into UnityIL2CPP — removed

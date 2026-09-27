@@ -9,7 +9,7 @@
 //
 // ponytail: shadowhook handles trampoline allocation internally — no manual management needed.
 
-#include "../../IHookEngines.h"
+#include "../../../IHookEngines.h"
 
 #include <string>
 #include <unordered_map>

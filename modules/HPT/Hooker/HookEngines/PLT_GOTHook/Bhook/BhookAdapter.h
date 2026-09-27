@@ -9,7 +9,7 @@
 //
 // ponytail: PLT/GOT hooking is simpler than inline hooking — no trampoline mgmt needed.
 
-#include "../../IHookEngines.h"
+#include "../../../IHookEngines.h"
 
 #include <string>
 #include <unordered_map>

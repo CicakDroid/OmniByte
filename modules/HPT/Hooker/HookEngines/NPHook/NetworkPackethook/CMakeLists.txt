@@ -15,7 +15,7 @@ set(NPHOOK_VERSION "1.0.0")
 #   - POSIX.1-2008 standard: send(), recv(), read(), write(), connect(), socket()
 
 add_library(np_hook_adapter STATIC
-    NetworkPackethook/NetworkPacketHookAdapter.cpp
+    NetworkPacketHookAdapter.cpp
 )
 
 target_include_directories(np_hook_adapter PUBLIC

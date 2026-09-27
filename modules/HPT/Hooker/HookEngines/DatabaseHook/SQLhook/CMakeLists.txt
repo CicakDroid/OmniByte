@@ -12,7 +12,8 @@ include(FetchContent)
 FetchContent_Declare(
     sqlite
     URL https://www.sqlite.org/2024/sqlite-amalgamation-3450000.zip
-    URL_HASH SHA256=62284efebc05a76f908c2e68e984d1506765a4e18c2b938e6a2d2ee0b2178d9f
+    # re-pinned: verified 3x across www+www2 (zip integrity, SQLITE_VERSION 3.45.0); old pin matched neither SHA256 nor SHA3-256 of the served file
+    URL_HASH SHA256=bde30d13ebdf84926ddd5e8b6df145be03a577a48fd075a087a5dd815bcdf740
 )
 FetchContent_MakeAvailable(sqlite)
 

@@ -11,11 +11,15 @@ set(KITTYMEMORYEX_VERSION "2.0")
 # --- Fetch upstream ---
 include(FetchContent)
 
+# SOURCE_SUBDIR names a dir that does not exist, so MakeAvailable populates
+# sources but skips add_subdirectory: both upstream roots unconditionally add
+# example-android, whose duplicate ExampleProject target fails CMP0002.
 FetchContent_Declare(
     kittymemory
     GIT_REPOSITORY https://github.com/MJx0/KittyMemory
     GIT_TAG        master   # no tags available
     GIT_SHALLOW    TRUE
+    SOURCE_SUBDIR  no-cmake
 )
 FetchContent_MakeAvailable(kittymemory)
 
@@ -24,6 +28,7 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/MJx0/KittyMemoryEx
     GIT_TAG        main     # no tags available
     GIT_SHALLOW    TRUE
+    SOURCE_SUBDIR  no-cmake
 )
 FetchContent_MakeAvailable(kittymemoryex)
 
@@ -34,6 +39,7 @@ target_include_directories(kittymemory_adapter PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../..    # HPT root (MemoryEditor.h)
     ${kittymemory_SOURCE_DIR}
+    ${kittymemory_SOURCE_DIR}/KittyMemory    # KittyMemory.hpp lives in this subdir
 )
 target_link_libraries(kittymemory_adapter PRIVATE log)
 
@@ -44,5 +50,6 @@ target_include_directories(kittymemoryex_adapter PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../..    # HPT root (MemoryEditor.h)
     ${kittymemoryex_SOURCE_DIR}
+    ${kittymemoryex_SOURCE_DIR}/KittyMemoryEx  # KittyMemoryEx.hpp lives in this subdir
 )
 target_link_libraries(kittymemoryex_adapter PRIVATE log)

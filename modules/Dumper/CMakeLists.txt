@@ -13,8 +13,9 @@ add_subdirectory(DumperCore)
 add_subdirectory(Engines)
 add_subdirectory(Export)
 
-# Link shared metadata interface
-target_link_libraries(dumper PUBLIC shared)
+# Link shared metadata interface; `common` supplies the repo-root include dir
+# (for "config/...") and nlohmann used by Dumper.h/Dumper.cpp.
+target_link_libraries(dumper PUBLIC shared common)
 
 # ---------------------------------------------------------------------------
 # Real wiring (uncomment as sub-libraries become available):

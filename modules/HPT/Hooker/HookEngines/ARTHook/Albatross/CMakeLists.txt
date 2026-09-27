@@ -5,7 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # --- Upstream version (bump when updating) ---
-set(ALBATROSS_VERSION "3.6.0")
+# Upstream tags are prefixed with `v` — bare "3.6.0" fails git checkout.
+set(ALBATROSS_VERSION "v3.6.0")
 
 # --- Fetch upstream ---
 include(FetchContent)

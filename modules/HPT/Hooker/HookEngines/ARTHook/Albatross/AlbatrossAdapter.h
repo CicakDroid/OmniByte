@@ -9,7 +9,7 @@
 //
 // ponytail: JNI bridge is inherently complex; no simpler path exists here.
 
-#include "../../IHookEngines.h"
+#include "../../../IHookEngines.h"
 
 #include <jni.h>
 #include <string>
