@@ -8,9 +8,13 @@
 
 #include "PatternScanner.h"
 
+#include "../Highway/Highway.h"
+#include "BoostAdapter.h"
+
 #include <android/log.h>
 #include <algorithm>
 #include <array>
+#include <optional>
 #include <queue>
 #include <cstdlib>
 #include <sstream>
@@ -20,6 +24,44 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 
 namespace omnibyte::common {
+
+namespace {
+
+PatternSignature toSignature(const uint8_t* pattern, const uint8_t* mask, size_t patternLen) {
+    PatternSignature sig;
+    sig.bytes.assign(pattern, pattern + patternLen);
+    if (mask) sig.mask.assign(mask, mask + patternLen);
+    return sig;
+}
+
+bool hasWildcard(const uint8_t* mask, size_t patternLen) {
+    if (!mask) return false;
+    for (size_t i = 0; i < patternLen; ++i) {
+        if (mask[i] != 0) return true;
+    }
+    return false;
+}
+
+std::vector<PatternMatch> collectFromOffsets(
+    const uint8_t* data, size_t patternLen,
+    const std::vector<size_t>& offsets, const ScanConfig& config
+) {
+    std::vector<PatternMatch> results;
+    for (size_t off : offsets) {
+        PatternMatch m;
+        m.offset = off;
+        m.patternIndex = 0;
+        m.matchedBytes.assign(data + off, data + off + patternLen);
+        results.push_back(m);
+        if (!config.findAll && results.size() >= config.maxResults) break;
+    }
+    if (config.maxResults > 0 && results.size() > config.maxResults) {
+        results.resize(config.maxResults);
+    }
+    return results;
+}
+
+} // namespace
 
 // ─── Hex Pattern Parser ──────────────────────────────────────────────────────
 
@@ -281,9 +323,7 @@ std::vector<PatternMatch> PatternScanner::scanSingle(
     parseHexPattern(hexPattern, bytes, mask);
 
     if (bytes.empty()) return {};
-
-    // Auto-select: BMH for single pattern (fast skip, O(n/m) average).
-    return bmhScan(data, dataLen, bytes.data(), mask.data(), bytes.size(), config);
+    return scanSingle(data, dataLen, bytes.data(), mask.data(), bytes.size(), config);
 }
 
 std::vector<PatternMatch> PatternScanner::scanSingle(
@@ -291,7 +331,33 @@ std::vector<PatternMatch> PatternScanner::scanSingle(
     const uint8_t* pattern, const uint8_t* mask, size_t patternLen,
     const ScanConfig& config
 ) {
-    return bmhScan(data, dataLen, pattern, mask, patternLen, config);
+    if (!data || !pattern || patternLen == 0 || dataLen < patternLen) return {};
+
+    size_t start = config.startOffset;
+    size_t end = config.endOffset > 0
+        ? std::min(config.endOffset, dataLen - patternLen + 1)
+        : dataLen - patternLen + 1;
+    if (start >= end) return {};
+
+    auto sig = toSignature(pattern, mask, patternLen);
+    auto offsets = HighwayAdapter::instance().FindAllPatterns(data + start, end - start, sig);
+    for (auto& off : offsets) off += start;
+
+    if (offsets.empty() && !hasWildcard(mask, patternLen)) {
+        if (auto first = BoostAdapter::instance().BoyerMooreSearch(
+                data + start, end - start, pattern, patternLen)) {
+            offsets.push_back(*first + start);
+            if (config.findAll) {
+                auto rest = HighwayAdapter::instance().FindAllPatterns(
+                    data + *first + start + 1,
+                    end - start - *first - 1,
+                    sig);
+                for (auto off : rest) offsets.push_back(*first + start + 1 + off);
+            }
+        }
+    }
+
+    return collectFromOffsets(data, patternLen, offsets, config);
 }
 
 std::vector<PatternMatch> PatternScanner::scanMultiple(
@@ -301,12 +367,11 @@ std::vector<PatternMatch> PatternScanner::scanMultiple(
 ) {
     if (patterns.empty()) return {};
     if (patterns.size() == 1) {
-        return bmhScan(data, dataLen,
-                       patterns[0].bytes.data(),
-                       patterns[0].mask.data(),
-                       patterns[0].bytes.size(), config);
+        return scanSingle(data, dataLen,
+                          patterns[0].bytes.data(),
+                          patterns[0].mask.data(),
+                          patterns[0].bytes.size(), config);
     }
-    // Auto-select: Aho-Corasick for multiple patterns.
     return ahoCorasickScan(data, dataLen, patterns, config);
 }
 
@@ -329,7 +394,7 @@ std::vector<PatternMatch> PatternScanner::scanWith(
         }
         case ScanAlgorithm::Auto:
         default:
-            return bmhScan(data, dataLen, pattern, mask, patternLen, config);
+            return scanSingle(data, dataLen, pattern, mask, patternLen, config);
     }
 }
 
