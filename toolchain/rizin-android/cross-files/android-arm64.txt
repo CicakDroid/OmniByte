@@ -1,0 +1,26 @@
+# Meson cross-file template: Android arm64-v8a.
+# Processed by build-scripts/build.sh via sed:
+#   s|TOOLCHAIN|<path to NDK toolchains/llvm/prebuilt/<host>>|g
+#   s|API|<minSdk API level, e.g. 24>|g
+# Do NOT edit a generated copy -- edit this template.
+#
+# NOTE: NDK ships no llvm-pkg-config, so no pkgconfig entry here.
+# build.sh sets PKG_CONFIG_LIBDIR=/nonexistent so host pkg-config
+# resolves nothing and meson falls back to rizin's bundled wraps.
+
+[binaries]
+c = 'TOOLCHAIN/bin/aarch64-linux-androidAPI-clang'
+cpp = 'TOOLCHAIN/bin/aarch64-linux-androidAPI-clang++'
+ar = 'TOOLCHAIN/bin/llvm-ar'
+ranlib = 'TOOLCHAIN/bin/llvm-ranlib'
+strip = 'TOOLCHAIN/bin/llvm-strip'
+
+[built-in options]
+c_args = ['-fPIC', '-O2']
+cpp_args = ['-fPIC', '-O2']
+
+[host_machine]
+system = 'android'
+cpu_family = 'aarch64'
+cpu = 'arm64-v8a'
+endian = 'little'
