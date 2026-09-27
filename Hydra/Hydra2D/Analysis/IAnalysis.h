@@ -239,6 +239,34 @@ struct ExportsResult {
     size_t weakExports = 0;
 };
 
+/// Stack-frame access kinds detected in ARM64 code.
+enum class FrameOpKind {
+    SpSub,      // sub sp/sp-related immediate (frame allocation)
+    SpAdd,      // add sp-related immediate (frame deallocation)
+    PairLoad,   // ldp (including pre/post-index forms)
+    PairStore,  // stp (including pre/post-index forms)
+    Load,       // ldr / ldur (unscaled, unsigned, pre/post-index)
+    Store,      // str / stur (unscaled, unsigned, pre/post-index)
+};
+
+/// One detected stack-frame access.
+struct FrameInfo {
+    uint64_t address = 0;       // instruction address
+    FrameOpKind kind{};         // operation kind
+    uint8_t baseReg = 0;        // base register (31 = sp, 29 = fp/x29)
+    uint8_t reg = 0;            // second register (rd for sp add/sub, rt for loads/stores)
+    int64_t offset = 0;         // signed immediate offset, already scaled
+};
+
+/// Results from stack-frame access analysis.
+struct FrameResult {
+    bool success = false;
+    std::string errorMessage;
+    bool hasFramePointer = false;
+    int64_t frameSize = 0;              // largest sp-subtract (frame allocation)
+    std::vector<FrameInfo> accesses;    // all sp/fp-relative accesses, in order
+};
+
 // ── Abstract interface ──────────────────────────────────────────────────
 
 /// Abstract interface for binary analysis algorithms.
@@ -374,6 +402,13 @@ public:
         uint64_t /*codeBaseAddr*/,
         const std::vector<uint8_t>& /*codeData*/,
         const std::vector<SymbolInfo>& /*symbols*/
+    ) const { return {}; }
+
+    // ── Frame analysis — default stubs ──────────────────────────────
+
+    virtual FrameResult analyzeFrame(
+        uint64_t /*baseAddr*/,
+        const std::vector<uint8_t>& /*codeData*/
     ) const { return {}; }
 };
 

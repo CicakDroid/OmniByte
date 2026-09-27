@@ -6,6 +6,7 @@
 
 #include "Analysis/Confidences.h"
 #include "Analysis/Exports.h"
+#include "Analysis/Frame.h"
 #include "Analysis/Imports.h"
 #include "Analysis/Strings.h"
 
@@ -429,6 +430,181 @@ static void test_ianalysis_defaults() {
     ExportsResult ex = c.analyzeExports(0, empty, noSyms);
     ASSERT_FALSE(ex.success);
 
+    FrameResult fr = c.analyzeFrame(0, empty);
+    ASSERT_FALSE(fr.success);
+
+    PASS();
+}
+
+// ── Frame ─────────────────────────────────────────────────────────────
+
+static void test_frame_empty() {
+    TEST(frame_empty_input);
+    Frame f;
+    std::vector<uint8_t> empty;
+    auto result = f.analyzeFrame(0, empty);
+    ASSERT_TRUE(result.success);
+    ASSERT_TRUE(result.accesses.empty());
+    ASSERT_EQ(result.frameSize, 0);
+    ASSERT_FALSE(result.hasFramePointer);
+    PASS();
+}
+
+static void test_frame_name() {
+    TEST(frame_name);
+    Frame f;
+    ASSERT_EQ(f.name(), std::string("Frame"));
+    PASS();
+}
+
+static void test_frame_sp_imm() {
+    TEST(frame_sp_add_sub_imm);
+    Frame f;
+    // sub sp, sp, #48 / add sp, sp, #48
+    std::vector<uint8_t> code = {
+        0xFF, 0xC3, 0x00, 0xD1,
+        0xFF, 0xC3, 0x00, 0x91,
+    };
+    auto result = f.analyzeFrame(0x1000, code);
+    ASSERT_TRUE(result.success);
+    ASSERT_EQ(result.accesses.size(), 2u);
+    ASSERT_TRUE(result.accesses[0].kind == FrameOpKind::SpSub);
+    ASSERT_EQ(result.accesses[0].baseReg, 31);
+    ASSERT_EQ(result.accesses[0].reg, 31);
+    ASSERT_EQ(result.accesses[0].offset, 48);
+    ASSERT_EQ(result.accesses[0].address, 0x1000u);
+    ASSERT_TRUE(result.accesses[1].kind == FrameOpKind::SpAdd);
+    ASSERT_EQ(result.accesses[1].offset, 48);
+    ASSERT_EQ(result.frameSize, 48);
+    ASSERT_FALSE(result.hasFramePointer);
+    PASS();
+}
+
+static void test_frame_sp_shifted_imm() {
+    TEST(frame_sp_imm_shifted);
+    Frame f;
+    // sub sp, sp, #4096 (bit22 set → imm12 << 12)
+    std::vector<uint8_t> code = {
+        0xFF, 0x07, 0x40, 0xD1,
+    };
+    auto result = f.analyzeFrame(0, code);
+    ASSERT_TRUE(result.success);
+    ASSERT_EQ(result.accesses.size(), 1u);
+    ASSERT_EQ(result.accesses[0].offset, 4096);
+    ASSERT_EQ(result.frameSize, 4096);
+    PASS();
+}
+
+static void test_frame_pair_indexed() {
+    TEST(frame_ldp_stp_indexed);
+    Frame f;
+    // stp x29, x30, [sp, #-16]! / ldp x29, x30, [sp], #16
+    std::vector<uint8_t> code = {
+        0xFD, 0x7B, 0xBF, 0xA9,
+        0xFD, 0x7B, 0xC1, 0xA8,
+    };
+    auto result = f.analyzeFrame(0, code);
+    ASSERT_TRUE(result.success);
+    ASSERT_EQ(result.accesses.size(), 2u);
+    ASSERT_TRUE(result.accesses[0].kind == FrameOpKind::PairStore);
+    ASSERT_EQ(result.accesses[0].baseReg, 31);
+    ASSERT_EQ(result.accesses[0].reg, 29);
+    ASSERT_EQ(result.accesses[0].offset, -16);
+    ASSERT_TRUE(result.accesses[1].kind == FrameOpKind::PairLoad);
+    ASSERT_EQ(result.accesses[1].offset, 16);
+    ASSERT_FALSE(result.hasFramePointer);
+    PASS();
+}
+
+static void test_frame_load_store() {
+    TEST(frame_ldr_str_forms);
+    Frame f;
+    // str x0,[sp,#8] / ldr x5,[sp] / ldr x0,[sp,#-16] / str x0,[sp,#-16]! / ldr x0,[sp],#16
+    std::vector<uint8_t> code = {
+        0xE0, 0x07, 0x00, 0xF9,
+        0xE5, 0x03, 0x40, 0xF9,
+        0xE0, 0x03, 0x5F, 0xF8,
+        0xE0, 0x0F, 0x1F, 0xF8,
+        0xE0, 0x07, 0x41, 0xF8,
+    };
+    auto result = f.analyzeFrame(0, code);
+    ASSERT_TRUE(result.success);
+    ASSERT_EQ(result.accesses.size(), 5u);
+    ASSERT_TRUE(result.accesses[0].kind == FrameOpKind::Store);
+    ASSERT_EQ(result.accesses[0].offset, 8);
+    ASSERT_TRUE(result.accesses[1].kind == FrameOpKind::Load);
+    ASSERT_EQ(result.accesses[1].offset, 0);
+    ASSERT_EQ(result.accesses[1].reg, 5);
+    ASSERT_EQ(result.accesses[2].offset, -16);
+    ASSERT_TRUE(result.accesses[3].kind == FrameOpKind::Store);
+    ASSERT_EQ(result.accesses[3].offset, -16);
+    ASSERT_TRUE(result.accesses[4].kind == FrameOpKind::Load);
+    ASSERT_EQ(result.accesses[4].offset, 16);
+    PASS();
+}
+
+static void test_frame_fp_base() {
+    TEST(frame_fp_base_detection);
+    Frame f;
+    // ldur x0, [x29, #-8]
+    std::vector<uint8_t> code = {
+        0xA0, 0x83, 0x5F, 0xF8,
+    };
+    auto result = f.analyzeFrame(0, code);
+    ASSERT_TRUE(result.success);
+    ASSERT_EQ(result.accesses.size(), 1u);
+    ASSERT_EQ(result.accesses[0].baseReg, 29);
+    ASSERT_EQ(result.accesses[0].offset, -8);
+    ASSERT_TRUE(result.hasFramePointer);
+    PASS();
+}
+
+static void test_frame_non_frame() {
+    TEST(frame_ignores_non_frame_insns);
+    Frame f;
+    // mov x0,x1 / ret / adrp / ldtr x3,[sp,#8] (unprivileged → skipped)
+    std::vector<uint8_t> code = {
+        0xE0, 0x03, 0x01, 0xAA,
+        0xC0, 0x03, 0x5F, 0xD6,
+        0x00, 0x00, 0x00, 0x90,
+        0xE3, 0x8B, 0x40, 0xF8,
+    };
+    auto result = f.analyzeFrame(0, code);
+    ASSERT_TRUE(result.success);
+    ASSERT_TRUE(result.accesses.empty());
+    ASSERT_EQ(result.frameSize, 0);
+    ASSERT_FALSE(result.hasFramePointer);
+    PASS();
+}
+
+static void test_frame_combined() {
+    TEST(frame_combined_analysis);
+    Frame f;
+    // sub sp,sp,#48 / ldur x0,[x29,#-8]
+    std::vector<uint8_t> code = {
+        0xFF, 0xC3, 0x00, 0xD1,
+        0xA0, 0x83, 0x5F, 0xF8,
+    };
+    auto result = f.analyzeFrame(0x400000, code);
+    ASSERT_TRUE(result.success);
+    ASSERT_EQ(result.accesses.size(), 2u);
+    ASSERT_EQ(result.frameSize, 48);
+    ASSERT_TRUE(result.hasFramePointer);
+    ASSERT_EQ(result.accesses[1].address, 0x400004u);
+    PASS();
+}
+
+static void test_frame_trailing_bytes() {
+    TEST(frame_trailing_partial_word_ignored);
+    Frame f;
+    // sub sp,sp,#48 + 1 stray byte (partial trailing word)
+    std::vector<uint8_t> code = {
+        0xFF, 0xC3, 0x00, 0xD1,
+        0xE0,
+    };
+    auto result = f.analyzeFrame(0, code);
+    ASSERT_TRUE(result.success);
+    ASSERT_EQ(result.accesses.size(), 1u);
     PASS();
 }
 
@@ -466,6 +642,18 @@ int main() {
     test_exports_demangle();
     test_exports_dynamic_detection();
     test_exports_address_to_name();
+
+    printf("\n[Frame]\n");
+    test_frame_empty();
+    test_frame_name();
+    test_frame_sp_imm();
+    test_frame_sp_shifted_imm();
+    test_frame_pair_indexed();
+    test_frame_load_store();
+    test_frame_fp_base();
+    test_frame_non_frame();
+    test_frame_combined();
+    test_frame_trailing_bytes();
 
     printf("\n[IAnalysis Defaults]\n");
     test_ianalysis_defaults();
