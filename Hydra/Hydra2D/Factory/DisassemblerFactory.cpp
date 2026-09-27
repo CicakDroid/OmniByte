@@ -1,26 +1,15 @@
 #include "Factory/DisassemblerFactory.h"
 
-// Forward declaration — Capstone backend free function from disassembler_capstone.cpp
-namespace omnibyte::hydradis {
-    std::unique_ptr<IDisassembler> createCapstoneDisassembler(DisassemblerArch arch);
-}
-
 namespace omnibyte::hydradis {
 
-std::unique_ptr<IDisassembler> DisassemblerFactory::create(
+std::unique_ptr<HydraDisassembler> DisassemblerFactory::create(
     DisassemblerArch arch,
     DisassemblerBackend backend
 ) {
-    switch (backend) {
-        case DisassemblerBackend::Capstone:
-            return createCapstoneDisassembler(arch);
-
-        default:
-            return nullptr;
-    }
+    return createDisassembler(backend, arch);
 }
 
-std::unique_ptr<IDisassembler> DisassemblerFactory::createFromMachine(
+std::unique_ptr<HydraDisassembler> DisassemblerFactory::createFromMachine(
     uint16_t machine,
     bool is64Bit,
     DisassemblerBackend backend

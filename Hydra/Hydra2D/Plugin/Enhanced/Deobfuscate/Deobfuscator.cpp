@@ -1,5 +1,5 @@
 #include "Plugin/IPlugin.h"
-#include "Disassembler/IDisassembler.h"
+#include "Disassembler/HydraDisassembler.h"
 #include "Parser/IParser.h"
 #include "DexKit/DexKitAdapter.h"
 #include "hrtng/HrtngDeob.h"

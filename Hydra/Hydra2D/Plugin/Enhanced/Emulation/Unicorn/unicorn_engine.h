@@ -1,7 +1,7 @@
 #pragma once
 // ── unicorn_engine.h ───────────────────────────────────────────────
 // Wrapper untuk Unicorn Engine (CPU emulation).
-// Menerima Instruction[] dari IDisassembler dan mengeksekusinya
+// Menerima Instruction[] dari HydraDisassembler dan mengeksekusinya
 // dalam environment emulasi yang terisolasi.
 //
 // Unicorn Engine: https://github.com/unicorn-engine/unicorn
@@ -36,7 +36,7 @@ typedef unsigned int uc_mode;
 namespace omnibyte::hydradis {
 
 // ── Forward declarations ────────────────────────────────────────
-struct Instruction;  // from IDisassembler.h
+struct Instruction;  // from HydraDisassembler.h
 
 // ── Emulation Trace Types ───────────────────────────────────────
 
@@ -110,7 +110,7 @@ struct UnicornConfig {
 
 // ── Unicorn Engine Wrapper ──────────────────────────────────────
 
-/// Wrapper untuk Unicorn Engine yang menerima Instruction[] dari IDisassembler.
+/// Wrapper untuk Unicorn Engine yang menerima Instruction[] dari HydraDisassembler.
 ///
 /// Usage:
 ///   UnicornEngine engine;
@@ -131,9 +131,9 @@ public:
     UnicornEngine& operator=(UnicornEngine&& other) noexcept;
 
     /// Initialize engine untuk arsitektur tertentu.
-    /// @param arch  DisassemblerArch dari IDisassembler
+    /// @param arch  DisassemblerArch dari HydraDisassembler
     /// @return true jika berhasil
-    bool initialize(int arch);  // pakai int untuk avoid depend ke IDisassembler.h di header
+    bool initialize(int arch);  // pakai int untuk avoid depend ke HydraDisassembler.h di header
 
     /// Apakah engine sudah ter-initialize
     bool isInitialized() const;
@@ -141,7 +141,7 @@ public:
     /// Cleanup semua resource
     void shutdown();
 
-    /// Eksekusi instruksi dari IDisassembler.
+    /// Eksekusi instruksi dari HydraDisassembler.
     /// @param instructions  vector Instruction dari DisassemblyResult
     /// @param config        konfigurasi emulation (optional, pakai default kalau kosong)
     /// @return EmulationResult dengan trace dan state

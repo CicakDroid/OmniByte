@@ -5,7 +5,7 @@
 //
 // Design principles:
 //   - PluginContext menggabungkan output dari 3 backend HydraDis
-//     (IDisassembler, IParser, IDecompiler) supaya plugin tidak perlu
+//     (HydraDisassembler, IParser, IDecompiler) supaya plugin tidak perlu
 //     akses langsung ke instance backend.
 //   - Context menyediakan akses ke SEMUA hasil analisis (multi-section,
 //     multi-function), bukan hanya satu — konsisten dengan AnalysisResult
@@ -39,7 +39,7 @@
 // yang perlu akses member ParsedBinary, DisassemblyResult, DecompiledFunction.
 // Path relatif dari Plugin/ ke HydraDis root (../).
 #include "../Parser/IParser.h"
-#include "../Disassembler/IDisassembler.h"
+#include "../Disassembler/HydraDisassembler.h"
 #include "../Decompiler/IDecompiler.h"
 
 namespace omnibyte::hydradis::plugin {
@@ -61,7 +61,7 @@ struct PluginContext {
     // Binary header, semua sections, semua symbols
     const omnibyte::hydradis::ParsedBinary* binary = nullptr;
 
-    // ── Disassembler Output (IDisassembler) ───────────────────────
+    // ── Disassembler Output (HydraDisassembler) ───────────────────────
     // Semua section yang berhasil di-disassemble
     const std::vector<omnibyte::hydradis::DisassemblyResult>* disassemblyResults = nullptr;
 

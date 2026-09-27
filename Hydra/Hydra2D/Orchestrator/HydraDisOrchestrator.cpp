@@ -15,7 +15,7 @@ std::unique_ptr<IParser> HydraDisOrchestrator::createParser() const {
     return ParserFactory::create(config_.parserBackend);
 }
 
-std::unique_ptr<IDisassembler> HydraDisOrchestrator::createDisassembler(
+std::unique_ptr<HydraDisassembler> HydraDisOrchestrator::createDisassembler(
     DisassemblerArch arch
 ) const {
     return DisassemblerFactory::create(arch, config_.disasmBackend);

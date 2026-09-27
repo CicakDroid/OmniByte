@@ -6,4 +6,6 @@ project(hydradis_disassembler_backends LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_subdirectory(capstone-adapter)
+add_subdirectory(CapstoneAdapter)
+add_subdirectory(ProtobufAdapter)
+add_subdirectory(WasmAdapter)

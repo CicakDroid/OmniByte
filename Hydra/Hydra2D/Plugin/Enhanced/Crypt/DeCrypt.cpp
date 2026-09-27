@@ -3,7 +3,7 @@
 // Source: FIPS 197 (AES), FIPS 46-3 (DES), RFC 7914 (ChaCha20).
 
 #include "Plugin/IPlugin.h"
-#include "Disassembler/IDisassembler.h"
+#include "Disassembler/HydraDisassembler.h"
 #include "Plugin/Enhanced/Crypt/DeCrypt3/DeCrypt3.h"
 #include <sstream>
 #include <algorithm>

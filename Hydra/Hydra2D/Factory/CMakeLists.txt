@@ -22,7 +22,7 @@ target_include_directories(hydradis_factory
 # Backend .cpp files are compiled in their own subdirectories via FetchContent.
 # Factory only forward-declares their free functions.
 target_link_libraries(hydradis_factory
-    PUBLIC hydradis_disassembler_backends
+    PUBLIC hydradis_disassembler
     PUBLIC hydradis_parser_backends
     PUBLIC hydradis_decompiler_backends
 )

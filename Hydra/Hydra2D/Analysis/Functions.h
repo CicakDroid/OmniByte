@@ -11,7 +11,7 @@
 
 #include "IAnalysis.h"
 #include "Parser/IParser.h"
-#include "Disassembler/IDisassembler.h"
+#include "Disassembler/HydraDisassembler.h"
 
 #include <map>
 #include <set>

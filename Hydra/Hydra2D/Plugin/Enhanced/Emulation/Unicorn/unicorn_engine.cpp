@@ -21,7 +21,7 @@
 //   - unicorn-engine/unicorn: samples/sample_arm64.c
 
 #include "unicorn_engine.h"
-#include "Disassembler/IDisassembler.h"
+#include "Disassembler/HydraDisassembler.h"
 #include <chrono>
 #include <cstring>
 #include <sstream>
@@ -132,7 +132,7 @@ struct ArchMapping {
 };
 
 static ArchMapping mapArch(int disasmArch) {
-    // DisassemblerArch enum values (from IDisassembler.h):
+    // DisassemblerArch enum values (from HydraDisassembler.h):
     //   ARM=0, ARM_Thumb=1, ARM64=2, x86=3, x86_64=4
     switch (disasmArch) {
         case 2:  return {UC_ARCH_ARM64, UC_MODE_64, 8};

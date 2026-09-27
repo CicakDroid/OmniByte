@@ -8,7 +8,7 @@
 #include "Factory/ParserFactory.h"
 #include "Factory/DecompilerFactory.h"
 #include "Factory/SolverFactory.h"
-#include "Disassembler/IDisassembler.h"
+#include "Disassembler/HydraDisassembler.h"
 #include "Parser/IParser.h"
 #include "Decompiler/IDecompiler.h"
 
@@ -88,7 +88,7 @@ public:
     std::unique_ptr<IParser> createParser() const;
 
     /// Akses disassembler (untuk caller yang mau disassemble manual per-section).
-    std::unique_ptr<IDisassembler> createDisassembler(DisassemblerArch arch) const;
+    std::unique_ptr<HydraDisassembler> createDisassembler(DisassemblerArch arch) const;
 
 private:
     /// Dari BinaryHeader.machine + is64Bit → DisassemblerArch.

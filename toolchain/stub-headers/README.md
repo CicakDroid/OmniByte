@@ -23,6 +23,8 @@
 | CVC5 | `cvc5/cvc5.h` | [cvc5/cvc5](https://github.com/cvc5/cvc5) | 1.2.0 |
 | Triton | `triton/api.hpp`, `triton/archEnums.hpp`, `triton/cpuSize.hpp`, `triton/dllexport.hpp`, `triton/x8664Specifications.hpp` | [JonathanSalwan/Triton](https://github.com/JonathanSalwan/Triton) | 1.0 |
 | Rizin | `rz_core.h`, `rz_analysis.h`, `rz_ghidra.h` | [rizinorg/rizin](https://github.com/rizinorg/rizin) | 0.7 |
+| Protobuf | `google/protobuf/io/coded_stream.h`, `google/protobuf/wire_format_lite.h` | [protocolbuffers/protobuf](https://github.com/protocolbuffers/protobuf) | 25.3 |
+| Wabt | `wabt/binary-reader.h`, `wabt/binary-reader-nop.h` | [WebAssembly/wabt](https://github.com/WebAssembly/wabt) | 1.0.42 |
 
 ## How to run the syntax check
 

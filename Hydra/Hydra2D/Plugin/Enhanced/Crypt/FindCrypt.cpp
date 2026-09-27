@@ -1,5 +1,5 @@
 #include "Plugin/IPlugin.h"
-#include "Disassembler/IDisassembler.h"
+#include "Disassembler/HydraDisassembler.h"
 #include "Plugin/Enhanced/Crypt/FindCrypt3/FindCrypt3.h"
 #include <sstream>
 

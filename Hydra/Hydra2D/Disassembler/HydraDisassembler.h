@@ -1,11 +1,11 @@
 #pragma once
-// ── IDisassembler.h ────────────────────────────────────────────────
+// ── HydraDisassembler.h ────────────────────────────────────────────────
 // Kontrak dasar untuk semua disassembler backend (Capstone, Ghidra, dst).
 // Backend yang implement interface ini menangani detail per-arsitektur
 // (ARM, ARM64, x86, dst) -- caller tidak perlu tahu.
 //
 // Design principles:
-//   - Instance-per-arch: satu IDisassembler instance = satu arsitektur target.
+//   - Instance-per-arch: satu HydraDisassembler instance = satu arsitektur target.
 //     Caller (Detector/Analyzer) sudah tahu arch dari ELF e_machine header
 //     via IParser SEBELUM panggil disassemble(), jadi arch di-pass ke
 //     constructor backend, bukan ke disassemble().
@@ -24,7 +24,7 @@ namespace omnibyte::hydradis {
 // ── Data types ─────────────────────────────────────────────────────
 
 /// Architecture target untuk disassembly.
-/// Satu instance IDisassembler = satu arch + mode. Caller tentukan arch saat
+/// Satu instance HydraDisassembler = satu arch + mode. Caller tentukan arch saat
 /// construct backend via factory, bukan saat panggil disassemble().
 ///
 /// Alasan Opsi A (instance-per-arch) dipilih:
@@ -54,6 +54,19 @@ enum class DisassemblerArch {
     TMS320C64X, // TMS320C64x
     M680X,      // Motorola 68000 family
     EVM,        // Ethereum Virtual Machine
+    // ── bukan ISA ──
+    // Taruh di akhir supaya nilai numerik 14 anggota di atas tidak berubah
+    // (enum class tanpa nilai eksplisit → urutan menentukan nilai).
+    None,       // arch-agnostic (Protobuf AST stream — tidak punya ISA)
+    WASM,       // bytecode WebAssembly sebagai "arch" tersendiri
+};
+
+/// Backend disassembly yang tersedia.
+/// Definisi enum ini hanya boleh ada di sini — Factory/DisassemblerFactory.h memakainya lewat include ini.
+enum class DisassemblerBackend {
+    Capstone,   // default — selalu tersedia, ringan
+    Protobuf,   // TODO(ProtobufAdapter): wire-format parser, belum diimplement
+    WASM,       // TODO(WasmAdapter): WebAssembly decoder, belum diimplement
 };
 
 /// Satu instruksi hasil disassembly.
@@ -82,12 +95,12 @@ struct DisassemblyResult {
 ///
 /// Usage:
 ///   // Caller sudah tahu arch dari IParser->parseFile().header.machine
-///   std::unique_ptr<IDisassembler> disasm = factory->create(DisassemblerArch::ARM64);
+///   std::unique_ptr<HydraDisassembler> disasm = factory->create(DisassemblerArch::ARM64);
 ///   auto result = disasm->disassemble(codeBytes, 0x10000);
 ///   for (auto& instr : result.instructions) { ... }
-class IDisassembler {
+class HydraDisassembler {
 public:
-    virtual ~IDisassembler() = default;
+    virtual ~HydraDisassembler() = default;
 
     /// Nama backend (mis. "capstone", "ghidra") -- untuk logging/diagnostic.
     virtual std::string name() const = 0;
@@ -118,5 +131,16 @@ public:
         return disassemble(code.data(), code.size(), baseAddr, count);
     }
 };
+
+// ── Factory ────────────────────────────────────────────────────────
+
+/// Buat HydraDisassembler instance berdasarkan backend + arch.
+/// Dispatch murni di HydraDisassembler.cpp — tidak ada logic disassembly di sana.
+///
+/// @return instance, atau nullptr kalau backend/arch belum didukung
+std::unique_ptr<HydraDisassembler> createDisassembler(
+    DisassemblerBackend backend,
+    DisassemblerArch arch
+);
 
 } // namespace omnibyte::hydradis
