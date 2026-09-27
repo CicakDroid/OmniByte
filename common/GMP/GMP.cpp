@@ -197,7 +197,13 @@ bool BigInt::isNegative() const {
 
 BigInt BigInt::abs() const {
     BigInt result;
-    mpz_abs(result.val_, val_);
+    mpz_abs(result.raw(), val_);
+    return result;
+}
+
+BigInt BigInt::operator-() const {
+    BigInt result;
+    mpz_neg(result.raw(), val_);
     return result;
 }
 

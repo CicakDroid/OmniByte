@@ -49,6 +49,10 @@ public:
 
     /// Get raw mpz_t for interop with GMP functions.
     const mpz_t& raw() const { return val_; }
+    mpz_ptr raw() { return val_; }
+
+    /// Unary negation.
+    BigInt operator-() const;
 
     // Arithmetic operators.
     BigInt operator+(const BigInt& rhs) const;
@@ -111,6 +115,7 @@ public:
 
     /// Get raw mpf_t for interop.
     const mpf_t& raw() const { return val_; }
+    mpf_ptr raw() { return val_; }
 
     BigFloat operator+(const BigFloat& rhs) const;
     BigFloat operator-(const BigFloat& rhs) const;
