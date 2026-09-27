@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_subdirectory(Unicorn)
 add_subdirectory(Qemu)
 
-add_library(enhanced_emulation STATIC enhanced_emulation.cpp)
+add_library(enhanced_emulation STATIC Emulation.cpp)
 target_include_directories(enhanced_emulation PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../..
 )

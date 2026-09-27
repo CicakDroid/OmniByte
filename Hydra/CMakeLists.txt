@@ -7,9 +7,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Base placeholder target for the static-analysis engine core.
-add_library(engine_core STATIC engine_core.cpp)
+# engine_core.cpp was renamed to Hydra.cpp in the engine-core → Hydra refactor.
+add_library(engine_core STATIC Hydra.cpp)
 
-add_subdirectory(HydraDis)
+# HydraDis renamed to Hydra2D
+add_subdirectory(Hydra2D)
 add_subdirectory(Shared)
 
 # Link shared to engine_core

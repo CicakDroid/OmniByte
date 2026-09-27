@@ -13,12 +13,12 @@ add_subdirectory(FindCrypt3)
 add_subdirectory(DeCrypt3)
 
 # Plugin wrapper
-add_library(enhanced_findcrypt STATIC enhanced_findcrypt.cpp)
+add_library(enhanced_findcrypt STATIC FindCrypt.cpp)
 target_include_directories(enhanced_findcrypt PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../..
 )
 
-add_library(enhanced_decrypt STATIC enhanced_decrypt.cpp)
+add_library(enhanced_decrypt STATIC DeCrypt.cpp)
 target_include_directories(enhanced_decrypt PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../..
 )

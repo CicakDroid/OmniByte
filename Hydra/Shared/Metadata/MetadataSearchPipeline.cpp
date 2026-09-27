@@ -7,7 +7,7 @@
 #include <array>
 
 // Include DeCrypt3 for encryption detection and decryption
-#include "../HydraDis/Plugin/Enhanced/Crypt/DeCrypt3/DeCrypt3.h"
+#include "../../Hydra2D/Plugin/Enhanced/Crypt/DeCrypt3/DeCrypt3.h"
 
 namespace omnibyte::shared {
 

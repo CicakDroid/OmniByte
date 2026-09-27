@@ -6,7 +6,7 @@ project(plugin_deobfuscate LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(plugin_deobfuscate STATIC plugin_deobfuscate.cpp)
+add_library(plugin_deobfuscate STATIC Deobfuscator.cpp)
 target_include_directories(plugin_deobfuscate PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../..
 )

@@ -18,9 +18,13 @@ set(LIEF_PYTHON_API OFF CACHE BOOL "" FORCE)
 set(LIEF_DOC OFF CACHE BOOL "" FORCE)
 set(LIEF_TESTS OFF CACHE BOOL "" FORCE)
 set(LIEF_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(LIEF_PE OFF CACHE BOOL "" FORCE)
-set(LIEF_MACHO OFF CACHE BOOL "" FORCE)
 set(LIEF_ELF ON CACHE BOOL "" FORCE)
+# LIEF PE must stay ON: COFF module requires LIEF_PE (LIEFOptions.cmake).
+set(LIEF_PE ON CACHE BOOL "" FORCE)
+set(LIEF_MACHO OFF CACHE BOOL "" FORCE)
+# LIEF's install/export set would require our `log` shim target to be exported;
+# we never install LIEF, so disable both install(EXPORT) and export(EXPORT).
+set(LIEF_INSTALL OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(lief)
 
