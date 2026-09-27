@@ -44,6 +44,10 @@ struct RuntimeConfig {
     std::vector<std::string> memoryBackendPriority = {"KittyMemory"};
     bool enableMemoryWrite = false;
 
+    // Worker threads for the shared TaskFlow executor.
+    // 0 = std::thread::hardware_concurrency() at first TaskFlowAdapter::instance().
+    uint32_t workerThreadCount = 0;
+
     static RuntimeConfig defaults() { return {}; }
 
     static RuntimeConfig fromJson(const nlohmann::json& j) {
@@ -80,6 +84,7 @@ struct RuntimeConfig {
             cfg.memoryBackendPriority = j.at("memoryBackendPriority").get<std::vector<std::string>>();
         }
         cfg.enableMemoryWrite = omnibyte::common::getOr<bool>(j, "enableMemoryWrite", cfg.enableMemoryWrite);
+        cfg.workerThreadCount = omnibyte::common::getOr<uint32_t>(j, "workerThreadCount", cfg.workerThreadCount);
 
         return cfg;
     }
@@ -106,7 +111,8 @@ struct RuntimeConfig {
             {"stealthBackendPriority",   stealthBackendPriority},
             {"freedomProviderPriority",  freedomProviderPriority},
             {"memoryBackendPriority",    memoryBackendPriority},
-            {"enableMemoryWrite",        enableMemoryWrite}
+            {"enableMemoryWrite",        enableMemoryWrite},
+            {"workerThreadCount",        workerThreadCount}
         };
     }
 };
