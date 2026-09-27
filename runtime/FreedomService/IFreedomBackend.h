@@ -30,7 +30,7 @@ public:
         std::string stdout;
         std::string stderr;
     };
-    virtual ExecResult execCommand(const std::string& cmd) = 0;
+    virtual ExecResult execCommand(const std::string& cmd) const = 0;
 };
 
 } // namespace omnibyte::runtime

@@ -35,7 +35,7 @@ std::optional<std::string> SuiAdapter::readFilePrivileged(const std::string& pat
     return r.stdout;
 }
 
-IFreedomBackend::ExecResult SuiAdapter::execCommand(const std::string& cmd) {
+IFreedomBackend::ExecResult SuiAdapter::execCommand(const std::string& cmd) const {
     ExecResult result;
     // TODO: Route through JNI binder — Sui has no su binary.
     // env->CallObjectMethod(freedomServiceObj, jniExecCommandMethod, cmd);

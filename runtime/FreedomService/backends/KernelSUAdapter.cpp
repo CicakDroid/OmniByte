@@ -32,7 +32,7 @@ std::optional<std::string> KernelSUAdapter::readFilePrivileged(const std::string
     return r.stdout;
 }
 
-IFreedomBackend::ExecResult KernelSUAdapter::execCommand(const std::string& cmd) {
+IFreedomBackend::ExecResult KernelSUAdapter::execCommand(const std::string& cmd) const {
     ExecResult result;
     std::string fullCmd = "/data/adb/ksu/bin/su -c '" + cmd + "'";
     FILE* pipe = popen(fullCmd.c_str(), "r");

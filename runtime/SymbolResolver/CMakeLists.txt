@@ -15,7 +15,7 @@ include(FetchContent)
 FetchContent_Declare(
     xdl
     GIT_REPOSITORY https://github.com/hexhacking/xDL.git
-    GIT_TAG        main
+    GIT_TAG        master
 )
 FetchContent_MakeAvailable(xdl)
 target_link_libraries(symbols_xdl PRIVATE xdl)

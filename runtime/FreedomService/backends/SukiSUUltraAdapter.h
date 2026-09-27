@@ -19,7 +19,7 @@ public:
     bool isAvailable() const override;
     bool hasRoot() const override;
     std::optional<std::string> readFilePrivileged(const std::string& path) override;
-    ExecResult execCommand(const std::string& cmd) override;
+    ExecResult execCommand(const std::string& cmd) const override;
 
 private:
     /// Check SukiSU-Ultra specific markers (distinct from generic KernelSU).

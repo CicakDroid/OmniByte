@@ -31,7 +31,7 @@ std::optional<std::string> RootThreadAdapter::readFilePrivileged(const std::stri
     return r.stdout;
 }
 
-IFreedomBackend::ExecResult RootThreadAdapter::execCommand(const std::string& cmd) {
+IFreedomBackend::ExecResult RootThreadAdapter::execCommand(const std::string& cmd) const {
     ExecResult result;
     std::string fullCmd = "su -c '" + cmd + "'";
     FILE* pipe = popen(fullCmd.c_str(), "r");

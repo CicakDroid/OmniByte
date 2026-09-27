@@ -34,7 +34,7 @@ std::optional<std::string> SukiSUUltraAdapter::readFilePrivileged(const std::str
     return r.stdout;
 }
 
-IFreedomBackend::ExecResult SukiSUUltraAdapter::execCommand(const std::string& cmd) {
+IFreedomBackend::ExecResult SukiSUUltraAdapter::execCommand(const std::string& cmd) const {
     ExecResult result;
     // SukiSU-Ultra uses KernelSU-compatible su path but with stealth wrappers.
     // The su binary location may vary; try common paths.

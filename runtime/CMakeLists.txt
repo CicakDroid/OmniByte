@@ -14,7 +14,7 @@ add_subdirectory(SymbolResolver)
 add_subdirectory(FreedomService)
 add_subdirectory(ZigZag)
 add_subdirectory(ZigZagManager)
-add_subdirectory(HPT)
+# HPT lives at modules/HPT (top-level aggregator owns its target)
 add_subdirectory(HPTManager)
 add_subdirectory(Bridges)
 
