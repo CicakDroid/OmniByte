@@ -1,2 +1,4 @@
 test/il2cpp-test/libil2cpp.so
 .omo/
+toolchain/rizin-android/.build/
+toolchain/rizin-android/prebuilt/
